@@ -1,11 +1,17 @@
-use gtk4::glib;
-use std::collections::HashMap;
+mod scan;
+mod traverse_files;
+
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 use std::ops::Index;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
+use ustr::Ustr;
 use uuid::Uuid;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Default)]
+pub use scan::{Scanner, ScannerPtr};
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct TrackId(Uuid);
 
 impl TrackId {
@@ -43,14 +49,19 @@ impl From<AlbumId> for ObjectId {
     }
 }
 
+#[derive(Clone)]
 pub struct Track {
-    pub title: String,
+    pub path: PathBuf,
+
+    pub title: Ustr,
     pub album: AlbumId,
+    pub cd: u32,
+    pub position: u32,
 }
 
 pub struct Album {
-    pub title: String,
-    pub tracks: Vec<TrackId>,
+    pub title: Ustr,
+    pub tracks: BTreeMap<(u32, u32), TrackId>,
 }
 
 #[derive(Default)]
@@ -80,46 +91,6 @@ impl Index<AlbumId> for Database {
 impl Database {
     pub fn new() -> Database {
         Default::default()
-    }
-
-    pub fn load(&mut self, _: &Path) {
-        self.tracks.clear();
-        self.albums.clear();
-
-        let track_id_1 = TrackId::new();
-        let track_id_2 = TrackId::new();
-        let track_id_3 = TrackId::new();
-
-        let album_id = AlbumId::new();
-        self.albums.insert(
-            album_id,
-            Album {
-                title: "Some album".to_string(),
-                tracks: vec![track_id_1, track_id_2, track_id_3],
-            },
-        );
-
-        self.tracks.insert(
-            track_id_1,
-            Track {
-                title: "A track 1".to_string(),
-                album: album_id,
-            },
-        );
-        self.tracks.insert(
-            track_id_2,
-            Track {
-                title: "A track 2".to_string(),
-                album: album_id,
-            },
-        );
-        self.tracks.insert(
-            track_id_3,
-            Track {
-                title: "A track 3".to_string(),
-                album: album_id,
-            },
-        );
     }
 }
 

@@ -6,4 +6,13 @@ edition = "2024"
 [dependencies]
 gio = { version = "0.22.2", features = ["v2_74"] }
 gtk4 = { version = "0.11.1", features = ["v4_20"] }
-uuid = { version = "1.23.0", features = ["v4", "v7"] }
+uuid = { version = "1.23.0", features = ["v4", "v7", "serde"] }
+walkdir = "2.5.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+ustr = { version = "1.1.0", features = ["serde"] }
+dirs = "6.0.0"
+const_format = "0.2.35"
+anyhow = "1.0.102"
+seahash = "4.1.0"
+lofty = "0.23.3"

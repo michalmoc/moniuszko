@@ -11,6 +11,7 @@ use gtk4::{
     TreeListModel, TreeListRow, Widget, gdk, gio,
 };
 
+#[derive(Clone)]
 pub struct Ui {
     store: gio::ListStore,
     widget: ListView,
@@ -38,10 +39,6 @@ impl Ui {
         let tree = ListView::new(Some(selection), Some(factory));
         tree.add_controller(drag_source);
 
-        for (album_id, _) in &database.read().unwrap().albums {
-            store.append(&MediaListItem::new_album(*album_id));
-        }
-
         Self {
             store,
             widget: tree,
@@ -50,6 +47,23 @@ impl Ui {
 
     pub fn widget(&self) -> Widget {
         self.widget.clone().upcast()
+    }
+
+    pub fn repopulate(&self, database: &DatabasePtr) {
+        self.store.remove_all();
+
+        let mut albums = database
+            .read()
+            .unwrap()
+            .albums
+            .iter()
+            .map(|(id, album)| (*id, album.title))
+            .collect::<Vec<_>>();
+        albums.sort_by_key(|k| k.1);
+
+        for (album_id, _) in albums {
+            self.store.append(&MediaListItem::new_album(album_id));
+        }
     }
 }
 
@@ -93,7 +107,7 @@ fn create(item: &Object, database: &DatabasePtr) -> Option<gio::ListModel> {
         ObjectId::AlbumId(album_id) => {
             let store = gio::ListStore::new::<MediaListItem>();
 
-            for track in &database.read().unwrap()[album_id].tracks {
+            for (_, track) in &database.read().unwrap()[album_id].tracks {
                 store.append(&MediaListItem::new_track(*track));
             }
 
@@ -108,8 +122,7 @@ fn drag_prepare(
     y: f64,
     selection: &MultiSelection,
 ) -> Option<gdk::ContentProvider> {
-    println!("drag_prepare");
-
+    // TODO: selection is inside drag_source
     let mut current = drag_source
         .widget()
         .unwrap()
