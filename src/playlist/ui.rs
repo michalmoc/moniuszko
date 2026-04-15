@@ -1,5 +1,5 @@
 use crate::database::{DatabasePtr, ObjectId, TrackId};
-use crate::media_library::MediaListItem;
+use crate::playlist::ObjectIds;
 use crate::playlist::box_with_data::BoxWithData;
 use crate::playlist::ui_item::PlaylistItem;
 use gio::prelude::ListModelExt;
@@ -45,7 +45,7 @@ impl Ui {
         factory3.connect_bind(move |_, item| tree_bind3(item, &database_clone));
         let column3 = ColumnViewColumn::new(Some("album"), Some(factory3));
 
-        let drop_target = DropTarget::new(gio::ListStore::static_type(), DragAction::all());
+        let drop_target = DropTarget::new(ObjectIds::static_type(), DragAction::all());
         let store_clone = store.clone();
         let database_clone = database.clone();
         drop_target
@@ -210,25 +210,19 @@ fn on_drop(
 }
 
 fn get_dropped_tracks(value: &Value, database: &DatabasePtr) -> Vec<TrackId> {
-    let dropped = value.get::<gio::ListStore>().unwrap();
+    let dropped = value.get::<ObjectIds>().unwrap();
     let mut tracks = Vec::new();
     let database = database.read().unwrap();
 
-    for i in 0..dropped.n_items() {
-        let item = dropped.item(i).unwrap();
-
-        if let Some(item) = item.downcast_ref::<MediaListItem>() {
-            match item.get_object_id() {
-                ObjectId::None => {}
-                ObjectId::TrackId(track_id) => {
-                    tracks.push(track_id);
-                }
-                ObjectId::AlbumId(album_id) => {
-                    tracks.extend(database[album_id].tracks.values());
-                }
+    for item in dropped {
+        match item {
+            ObjectId::None => {}
+            ObjectId::TrackId(track_id) => {
+                tracks.push(track_id);
             }
-        } else if let Some(item) = item.downcast_ref::<PlaylistItem>() {
-            tracks.push(item.get_track_id());
+            ObjectId::AlbumId(album_id) => {
+                tracks.extend(database[album_id].tracks.values());
+            }
         }
     }
 
@@ -305,11 +299,12 @@ fn prepare_drag(
         }
     }
 
-    let mut object_ids = gio::ListStore::new::<PlaylistItem>();
+    let mut object_ids = ObjectIds::new();
     for i in 0..sm.n_items() {
         if sm.is_selected(i) {
             let row = sm.item(i).and_downcast::<PlaylistItem>().unwrap();
-            object_ids.append(&row);
+            object_ids.push(row.get_track_id().into());
+            object_ids.mark_entry_for_removal(row.uuid());
         }
     }
 
@@ -324,16 +319,11 @@ fn drag_end(source: &DragSource, drag: &Drag, remove: bool, store: &gio::ListSto
         return;
     }
 
-    if let Ok(content) = drag.content().value(gio::ListStore::static_type()) {
-        let content = content.get::<gio::ListStore>().unwrap();
-        let mut to_remove = HashSet::new();
+    if let Ok(content) = drag.content().value(ObjectIds::static_type()) {
+        let content = content.get::<ObjectIds>().unwrap();
+        let to_remove = content.entries_to_remove();
 
-        for i in 0..content.n_items() {
-            let elem = content.item(i).and_downcast::<PlaylistItem>().unwrap();
-            to_remove.insert(elem);
-        }
-
-        store.retain(|e| !to_remove.contains(e));
+        store.retain(|e| !to_remove.contains(&e.downcast_ref::<PlaylistItem>().unwrap().uuid()));
 
         let column_view = source.widget().and_downcast::<ColumnView>().unwrap();
         let sm = column_view.model().unwrap();

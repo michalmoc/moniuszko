@@ -1,10 +1,10 @@
 use crate::database::{DatabasePtr, ObjectId};
 use crate::media_library::ui_item::MediaListItem;
-use gio::ListStore;
+use crate::playlist::ObjectIds;
 use gio::prelude::{ListModelExt, ObjectExt, StaticType};
 use gtk4::glib::{Object, Value};
 use gtk4::prelude::{
-    Cast, CastNone, EventControllerExt, IsA, ListItemExt, SelectionModelExt, WidgetExt,
+    Cast, CastNone, EventControllerExt, ListItemExt, SelectionModelExt, WidgetExt,
 };
 use gtk4::{
     DragSource, Label, ListView, MultiSelection, PickFlags, SignalListItemFactory, TreeExpander,
@@ -21,8 +21,7 @@ impl Ui {
     pub fn new(database: &DatabasePtr) -> Self {
         let factory = SignalListItemFactory::new();
         factory.connect_setup(tree_setup);
-        let database_clone = database.clone();
-        factory.connect_bind(move |factory, item| tree_bind(factory, item, &database_clone));
+        factory.connect_bind(tree_bind);
 
         let store = gio::ListStore::new::<MediaListItem>();
         let database_clone = database.clone();
@@ -52,9 +51,9 @@ impl Ui {
     pub fn repopulate(&self, database: &DatabasePtr) {
         self.store.remove_all();
 
-        let mut albums = database
-            .read()
-            .unwrap()
+        let db = database.read().unwrap();
+
+        let mut albums = db
             .albums
             .iter()
             .map(|(id, album)| (*id, album.title))
@@ -62,7 +61,7 @@ impl Ui {
         albums.sort_by_key(|k| k.1);
 
         for (album_id, _) in albums {
-            self.store.append(&MediaListItem::new_album(album_id));
+            self.store.append(&MediaListItem::new_album(album_id, &db));
         }
     }
 }
@@ -76,7 +75,7 @@ fn tree_setup(factory: &SignalListItemFactory, list_item: &Object) {
     list_item.set_child(Some(&expander));
 }
 
-fn tree_bind(factory: &SignalListItemFactory, list_item: &Object, database: &DatabasePtr) {
+fn tree_bind(factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let expander = list_item.child().and_downcast::<TreeExpander>().unwrap();
@@ -85,30 +84,25 @@ fn tree_bind(factory: &SignalListItemFactory, list_item: &Object, database: &Dat
     let row = list_item.item().and_downcast::<TreeListRow>().unwrap();
     expander.set_list_row(Some(&row));
 
-    let dataobj = row
-        .item()
-        .and_downcast::<MediaListItem>()
-        .unwrap()
-        .get_object_id();
-
-    match dataobj {
-        ObjectId::None => label.set_label("unknown"),
-        ObjectId::TrackId(track_id) => label.set_label(&database.read().unwrap()[track_id].title),
-        ObjectId::AlbumId(album_id) => label.set_label(&database.read().unwrap()[album_id].title),
-    }
+    let dataobj = row.item().and_downcast::<MediaListItem>().unwrap();
+    dataobj
+        .bind_property("name", &label, "label")
+        .sync_create()
+        .build();
 }
 
 fn create(item: &Object, database: &DatabasePtr) -> Option<gio::ListModel> {
     let item = item.downcast_ref::<MediaListItem>().unwrap();
 
-    match item.get_object_id() {
+    match item.stored_object() {
         ObjectId::None => None,
         ObjectId::TrackId(_) => None,
         ObjectId::AlbumId(album_id) => {
             let store = gio::ListStore::new::<MediaListItem>();
 
-            for (_, track) in &database.read().unwrap()[album_id].tracks {
-                store.append(&MediaListItem::new_track(*track));
+            let db = database.read().unwrap();
+            for (_, track) in &db[album_id].tracks {
+                store.append(&MediaListItem::new_track(*track, &db));
             }
 
             Some(store.upcast())
@@ -145,7 +139,7 @@ fn drag_prepare(
         }
     }
 
-    let mut object_ids = ListStore::new::<MediaListItem>();
+    let mut object_ids = ObjectIds::new();
     for i in 0..selection.n_items() {
         if selection.is_selected(i) {
             let row = selection
@@ -154,7 +148,7 @@ fn drag_prepare(
                 .downcast::<TreeListRow>()
                 .unwrap();
             let dataobj = row.item().and_downcast::<MediaListItem>().unwrap();
-            object_ids.append(&dataobj);
+            object_ids.push(dataobj.stored_object());
         }
     }
 

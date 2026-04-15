@@ -1,9 +1,11 @@
 mod scan;
 mod traverse_files;
 
+use gtk4::glib;
+use gtk4::glib::property::Property;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use std::ops::Index;
+use std::ops::{Deref, DerefMut, Index};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use ustr::Ustr;
@@ -29,7 +31,8 @@ impl AlbumId {
     }
 }
 
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Default, Copy, Clone, Debug, glib::Boxed)]
+#[boxed_type(name = "ObjectId")]
 pub enum ObjectId {
     #[default]
     None,

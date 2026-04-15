@@ -1,18 +1,26 @@
-use crate::database::{AlbumId, ObjectId, TrackId};
+use crate::database::{AlbumId, Database, ObjectId, TrackId};
 use gio::subclass::prelude::ObjectSubclassIsExt;
 use gtk4::glib;
 use gtk4::glib::Object;
 
 mod imp {
     use crate::database::ObjectId;
+    use gio::subclass::prelude::{ObjectImplExt, ObjectSubclassExt};
     use gtk4::glib;
-    use gtk4::glib::Object;
+    use gtk4::glib::{Object, Properties};
+    use gtk4::prelude::ObjectExt;
+    use gtk4::subclass::prelude::DerivedObjectProperties;
     use gtk4::subclass::prelude::{ObjectImpl, ObjectSubclass};
-    use std::cell::Cell;
+    use std::cell::{Cell, RefCell};
 
-    #[derive(Default)]
+    #[derive(Default, Properties)]
+    #[properties(wrapper_type = super::MediaListItem)]
     pub struct MediaListItem {
+        #[property(get, set)]
         pub stored_object: Cell<ObjectId>,
+
+        #[property(get, set)]
+        pub name: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -22,6 +30,7 @@ mod imp {
         type ParentType = Object;
     }
 
+    #[glib::derived_properties]
     impl ObjectImpl for MediaListItem {}
 }
 
@@ -30,19 +39,17 @@ glib::wrapper! {
 }
 
 impl MediaListItem {
-    pub fn new_track(track_id: TrackId) -> Self {
-        let obj: Self = Object::builder().build();
-        obj.imp().stored_object.set(track_id.into());
-        obj
+    pub fn new_track(track_id: TrackId, database: &Database) -> Self {
+        Object::builder()
+            .property("stored_object", ObjectId::from(track_id))
+            .property("name", database[track_id].title.to_string())
+            .build()
     }
 
-    pub fn new_album(album_id: AlbumId) -> Self {
-        let obj: Self = Object::builder().build();
-        obj.imp().stored_object.set(album_id.into());
-        obj
-    }
-
-    pub fn get_object_id(&self) -> ObjectId {
-        self.imp().stored_object.get()
+    pub fn new_album(album_id: AlbumId, database: &Database) -> Self {
+        Object::builder()
+            .property("stored_object", ObjectId::from(album_id))
+            .property("name", database[album_id].title.to_string())
+            .build()
     }
 }
