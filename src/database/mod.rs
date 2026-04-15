@@ -2,10 +2,9 @@ mod scan;
 mod traverse_files;
 
 use gtk4::glib;
-use gtk4::glib::property::Property;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use std::ops::{Deref, DerefMut, Index};
+use std::ops::Index;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use ustr::Ustr;
@@ -13,7 +12,8 @@ use uuid::Uuid;
 
 pub use scan::{Scanner, ScannerPtr};
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Default, Serialize, Deserialize, glib::Boxed)]
+#[boxed_type(name = "TrackId")]
 pub struct TrackId(Uuid);
 
 impl TrackId {

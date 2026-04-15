@@ -46,6 +46,18 @@ fn build_ui(app: &Application, database: &DatabasePtr, scanner: &ScannerPtr, con
         .default_height(70)
         .build();
 
+    let playlist = playlist::Ui::new(database);
+    let playlist_sw = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Automatic)
+        .min_content_width(360)
+        .child(&playlist.widget())
+        .vexpand(true)
+        .hexpand(true)
+        .build();
+
+    let box_ = gtk4::Box::new(Orientation::Vertical, 0);
+    box_.append(&playlist_sw);
+
     let media_library = media_library::Ui::new(database);
     media_library.repopulate(database);
     media_library.widget().set_vexpand(true);
@@ -62,6 +74,7 @@ fn build_ui(app: &Application, database: &DatabasePtr, scanner: &ScannerPtr, con
     let scanner_clone = scanner.clone();
     let config_clone = config.clone();
     let media_library_clone = media_library.clone();
+    let playlist_clone = playlist.clone();
     refresh_button.connect_clicked(move |button| {
         refresh_button_cb(
             button,
@@ -69,24 +82,13 @@ fn build_ui(app: &Application, database: &DatabasePtr, scanner: &ScannerPtr, con
             &scanner_clone,
             &config_clone,
             &media_library_clone,
+            &playlist_clone,
         )
     });
 
     let media_library_box = gtk4::Box::new(Orientation::Vertical, 0);
     media_library_box.append(&media_library_sw);
     media_library_box.append(&refresh_button);
-
-    let playlist = playlist::Ui::new(database);
-    let playlist_sw = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Automatic)
-        .min_content_width(360)
-        .child(&playlist.widget())
-        .vexpand(true)
-        .hexpand(true)
-        .build();
-
-    let box_ = gtk4::Box::new(Orientation::Vertical, 0);
-    box_.append(&playlist_sw);
 
     let paned = Paned::new(Orientation::Horizontal);
     paned.set_start_child(Some(&media_library_box));
@@ -103,6 +105,7 @@ fn refresh_button_cb(
     scanner: &ScannerPtr,
     config: &ConfigPtr,
     media_library: &media_library::Ui,
+    playlist: &playlist::Ui,
 ) {
     let database_clone = database.clone();
     let database_clone2 = database.clone();
@@ -110,6 +113,7 @@ fn refresh_button_cb(
     let button_clone = button.clone();
     let config_clone = config.clone();
     let media_library_clone = media_library.clone();
+    let playlist_clone = playlist.clone();
 
     glib::spawn_future_local(async move {
         button_clone.set_sensitive(false);
@@ -132,6 +136,7 @@ fn refresh_button_cb(
         .expect("Task needs to finish successfully.");
 
         media_library_clone.repopulate(&database_clone2);
+        playlist_clone.refresh(&database_clone2);
         button_clone.set_sensitive(enable_button);
     });
 }

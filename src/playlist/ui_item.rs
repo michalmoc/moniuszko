@@ -1,11 +1,15 @@
-use crate::database::TrackId;
-use gio::subclass::prelude::ObjectSubclassIsExt;
+use crate::database::{Database, TrackId};
 use gtk4::glib;
 use gtk4::glib::Object;
 use uuid::Uuid;
 
+#[derive(glib::Boxed, Copy, Clone, Eq, PartialEq, Default, Hash)]
+#[boxed_type(name = "PlaylistEntryUuid")]
+pub struct PlaylistEntryUuid(Uuid);
+
 mod imp {
     use crate::database::TrackId;
+    use crate::playlist::ui_item::PlaylistEntryUuid;
     use gtk4::glib;
     use gtk4::glib::{Object, Properties};
     use gtk4::prelude::ObjectExt;
@@ -17,9 +21,19 @@ mod imp {
     #[properties(wrapper_type = super::PlaylistItem)]
     pub struct PlaylistItem {
         #[property(get, set)]
-        uuid: RefCell<String>,
+        uuid: Cell<PlaylistEntryUuid>,
 
-        pub stored_track: Cell<TrackId>,
+        #[property(get, set)]
+        stored_track: Cell<TrackId>,
+
+        #[property(get, set)]
+        position: Cell<u32>,
+
+        #[property(get, set)]
+        name: RefCell<String>,
+
+        #[property(get, set)]
+        album: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -38,17 +52,22 @@ glib::wrapper! {
 }
 
 impl PlaylistItem {
-    pub fn new(track_id: TrackId) -> Self {
+    pub fn new(track_id: TrackId, database: &Database) -> Self {
         let obj: Self = Object::builder()
-            .property("uuid", Uuid::new_v4().as_simple().to_string())
+            .property("uuid", PlaylistEntryUuid(Uuid::new_v4()))
+            .property("stored_track", track_id)
             .build();
-
-        obj.imp().stored_track.set(track_id);
-
+        obj.set_data(database);
         obj
     }
 
-    pub fn get_track_id(&self) -> TrackId {
-        self.imp().stored_track.get()
+    pub fn set_data(&self, database: &Database) {
+        self.set_position(database[self.stored_track()].position);
+        self.set_name(database[self.stored_track()].title.to_string());
+        self.set_album(
+            database[database[self.stored_track()].album]
+                .title
+                .to_string(),
+        );
     }
 }

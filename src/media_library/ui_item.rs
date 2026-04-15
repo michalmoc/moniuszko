@@ -1,11 +1,9 @@
 use crate::database::{AlbumId, Database, ObjectId, TrackId};
-use gio::subclass::prelude::ObjectSubclassIsExt;
 use gtk4::glib;
 use gtk4::glib::Object;
 
 mod imp {
     use crate::database::ObjectId;
-    use gio::subclass::prelude::{ObjectImplExt, ObjectSubclassExt};
     use gtk4::glib;
     use gtk4::glib::{Object, Properties};
     use gtk4::prelude::ObjectExt;

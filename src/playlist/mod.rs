@@ -1,4 +1,4 @@
-mod box_with_data;
+mod box_with_playlist_entry;
 mod dnd_item;
 mod ui;
 mod ui_item;

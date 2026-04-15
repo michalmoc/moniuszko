@@ -1,6 +1,6 @@
 use crate::database::{DatabasePtr, ObjectId, TrackId};
 use crate::playlist::ObjectIds;
-use crate::playlist::box_with_data::BoxWithData;
+use crate::playlist::box_with_playlist_entry::BoxWithPlaylistEntry;
 use crate::playlist::ui_item::PlaylistItem;
 use gio::prelude::ListModelExt;
 use gtk4::gdk::{Drag, DragAction, Key, ModifierType};
@@ -17,6 +17,7 @@ use gtk4::{
 };
 use std::collections::HashSet;
 
+#[derive(Clone)]
 pub struct Ui {
     store: gio::ListStore,
     widget: ColumnView,
@@ -29,20 +30,17 @@ impl Ui {
 
         let factory1 = SignalListItemFactory::new();
         factory1.connect_setup(tree_setup1);
-        let database_clone = database.clone();
-        factory1.connect_bind(move |_, item| tree_bind1(item, &database_clone));
+        factory1.connect_bind(tree_bind1);
         let column1 = ColumnViewColumn::new(Some("#"), Some(factory1));
 
         let factory2 = SignalListItemFactory::new();
         factory2.connect_setup(tree_setup2);
-        let database_clone = database.clone();
-        factory2.connect_bind(move |_, item| tree_bind2(item, &database_clone));
+        factory2.connect_bind(tree_bind2);
         let column2 = ColumnViewColumn::new(Some("title"), Some(factory2));
 
         let factory3 = SignalListItemFactory::new();
         factory3.connect_setup(tree_setup3);
-        let database_clone = database.clone();
-        factory3.connect_bind(move |_, item| tree_bind3(item, &database_clone));
+        factory3.connect_bind(tree_bind3);
         let column3 = ColumnViewColumn::new(Some("album"), Some(factory3));
 
         let drop_target = DropTarget::new(ObjectIds::static_type(), DragAction::all());
@@ -83,6 +81,14 @@ impl Ui {
         }
     }
 
+    pub fn refresh(&self, database: &DatabasePtr) {
+        let db = database.read().unwrap();
+        for i in 0..self.store.n_items() {
+            let item = self.store.item(i).and_downcast::<PlaylistItem>().unwrap();
+            item.set_data(&db);
+        }
+    }
+
     pub fn widget(&self) -> Widget {
         self.widget.clone().upcast()
     }
@@ -93,24 +99,31 @@ fn tree_setup1(_factory: &SignalListItemFactory, list_item: &Object) {
 
     let label = Label::new(None);
 
-    let box_ = BoxWithData::new();
+    let box_ = BoxWithPlaylistEntry::new();
     box_.append(&label);
 
     list_item.set_child(Some(&box_));
 }
 
-fn tree_bind1(list_item: &Object, database: &DatabasePtr) {
+fn tree_bind1(_factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
-    let box_ = list_item.child().and_downcast::<BoxWithData>().unwrap();
+    let box_ = list_item
+        .child()
+        .and_downcast::<BoxWithPlaylistEntry>()
+        .unwrap();
     let label = box_.first_child().and_downcast::<Label>().unwrap();
 
     let dataobj = list_item.item().and_downcast::<PlaylistItem>().unwrap();
-    let uuid = dataobj.uuid();
-    let track = dataobj.get_track_id();
 
-    label.set_label(&database.read().unwrap()[track].position.to_string());
-    box_.set_custom_data(uuid);
+    dataobj
+        .bind_property("uuid", &box_, "playlist")
+        .sync_create()
+        .build();
+    dataobj
+        .bind_property("position", &label, "label")
+        .sync_create()
+        .build();
 }
 
 fn tree_setup2(_factory: &SignalListItemFactory, list_item: &Object) {
@@ -121,15 +134,17 @@ fn tree_setup2(_factory: &SignalListItemFactory, list_item: &Object) {
     list_item.set_child(Some(&label));
 }
 
-fn tree_bind2(list_item: &Object, database: &DatabasePtr) {
+fn tree_bind2(_factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let label = list_item.child().and_downcast::<Label>().unwrap();
 
     let dataobj = list_item.item().and_downcast::<PlaylistItem>().unwrap();
-    let track = dataobj.get_track_id();
 
-    label.set_label(&database.read().unwrap()[track].title);
+    dataobj
+        .bind_property("name", &label, "label")
+        .sync_create()
+        .build();
 }
 
 fn tree_setup3(_factory: &SignalListItemFactory, list_item: &Object) {
@@ -140,17 +155,16 @@ fn tree_setup3(_factory: &SignalListItemFactory, list_item: &Object) {
     list_item.set_child(Some(&label));
 }
 
-fn tree_bind3(list_item: &Object, database: &DatabasePtr) {
+fn tree_bind3(_factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let label = list_item.child().and_downcast::<Label>().unwrap();
 
     let dataobj = list_item.item().and_downcast::<PlaylistItem>().unwrap();
-    let track = dataobj.get_track_id();
-    let album = database.read().unwrap()[track].album;
-    let name = database.read().unwrap()[album].title;
-
-    label.set_label(&name);
+    dataobj
+        .bind_property("album", &label, "label")
+        .sync_create()
+        .build();
 }
 
 fn on_drop(
@@ -169,8 +183,9 @@ fn on_drop(
     if closest == column_view {
         sm.unselect_all();
 
+        let db = database.read().unwrap();
         for track in tracks {
-            store.append(&PlaylistItem::new(track));
+            store.append(&PlaylistItem::new(track, &db));
             sm.select_item(store.n_items() - 1, false);
         }
         column_view.scroll_to(store.n_items() - 1, None, ListScrollFlags::FOCUS, None);
@@ -183,8 +198,9 @@ fn on_drop(
             sm.unselect_all();
 
             let mut last = 0;
+            let db = database.read().unwrap();
             for track in tracks.iter().rev() {
-                store.insert(index, &PlaylistItem::new(*track));
+                store.insert(index, &PlaylistItem::new(*track, &db));
                 sm.select_item(index, false);
                 last = index;
             }
@@ -194,8 +210,9 @@ fn on_drop(
             sm.unselect_all();
 
             let mut last = 0;
+            let db = database.read().unwrap();
             for track in tracks.iter().rev() {
-                store.insert(index + 1, &PlaylistItem::new(*track));
+                store.insert(index + 1, &PlaylistItem::new(*track, &db));
                 sm.select_item(index + 1, false);
                 last = index + 1;
             }
@@ -259,9 +276,9 @@ fn find_index(store: &gio::ListStore, row: &Widget) -> Option<u32> {
     let entry_uuid = row
         .first_child()?
         .first_child()?
-        .downcast::<BoxWithData>()
+        .downcast::<BoxWithPlaylistEntry>()
         .ok()?
-        .custom_data();
+        .playlist();
 
     store.find_with_equal_func(|o| o.downcast_ref::<PlaylistItem>().unwrap().uuid() == entry_uuid)
 }
@@ -303,7 +320,7 @@ fn prepare_drag(
     for i in 0..sm.n_items() {
         if sm.is_selected(i) {
             let row = sm.item(i).and_downcast::<PlaylistItem>().unwrap();
-            object_ids.push(row.get_track_id().into());
+            object_ids.push(row.stored_track().into());
             object_ids.mark_entry_for_removal(row.uuid());
         }
     }

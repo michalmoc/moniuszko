@@ -31,9 +31,7 @@ impl Ui {
 
         let selection = MultiSelection::new(Some(model));
         let drag_source = DragSource::new();
-        let selection_clone = selection.clone();
-        drag_source
-            .connect_prepare(move |source, x, y| drag_prepare(source, x, y, &selection_clone));
+        drag_source.connect_prepare(drag_prepare);
 
         let tree = ListView::new(Some(selection), Some(factory));
         tree.add_controller(drag_source);
@@ -66,7 +64,7 @@ impl Ui {
     }
 }
 
-fn tree_setup(factory: &SignalListItemFactory, list_item: &Object) {
+fn tree_setup(_factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let label = Label::new(None);
@@ -75,7 +73,7 @@ fn tree_setup(factory: &SignalListItemFactory, list_item: &Object) {
     list_item.set_child(Some(&expander));
 }
 
-fn tree_bind(factory: &SignalListItemFactory, list_item: &Object) {
+fn tree_bind(_factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let expander = list_item.child().and_downcast::<TreeExpander>().unwrap();
@@ -110,18 +108,11 @@ fn create(item: &Object, database: &DatabasePtr) -> Option<gio::ListModel> {
     }
 }
 
-fn drag_prepare(
-    drag_source: &DragSource,
-    x: f64,
-    y: f64,
-    selection: &MultiSelection,
-) -> Option<gdk::ContentProvider> {
-    // TODO: selection is inside drag_source
-    let mut current = drag_source
-        .widget()
-        .unwrap()
-        .pick(x, y, PickFlags::DEFAULT)
-        .unwrap();
+fn drag_prepare(drag_source: &DragSource, x: f64, y: f64) -> Option<gdk::ContentProvider> {
+    let list_view = drag_source.widget().and_downcast::<ListView>().unwrap();
+    let selection = list_view.model().unwrap();
+
+    let mut current = list_view.pick(x, y, PickFlags::DEFAULT).unwrap();
     while current.type_() != TreeExpander::static_type() {
         if let Some(parent) = current.parent() {
             current = parent;

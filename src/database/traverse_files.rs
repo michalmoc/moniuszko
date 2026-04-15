@@ -28,10 +28,6 @@ pub struct ScanResult {
 }
 
 impl FilesDatabase {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
     pub fn scan(&mut self, path: &Path) -> ScanResult {
         let mut result = ScanResult::default();
 
