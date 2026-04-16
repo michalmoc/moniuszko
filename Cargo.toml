@@ -16,3 +16,8 @@ const_format = "0.2.35"
 anyhow = "1.0.102"
 seahash = "4.1.0"
 lofty = "0.23.3"
+
+[dependencies.adw]
+package = "libadwaita"
+version = "0.9.1"
+features = ["v1_7"]

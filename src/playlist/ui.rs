@@ -176,6 +176,8 @@ fn on_drop(
     database: &DatabasePtr,
 ) -> bool {
     let column_view = target.widget().unwrap().downcast::<ColumnView>().unwrap();
+    column_view.grab_focus();
+
     let closest = find_closest(x, y, column_view.upcast_ref());
     let tracks = get_dropped_tracks(value, database);
     let sm = column_view.model().unwrap();
@@ -188,7 +190,9 @@ fn on_drop(
             store.append(&PlaylistItem::new(track, &db));
             sm.select_item(store.n_items() - 1, false);
         }
-        column_view.scroll_to(store.n_items() - 1, None, ListScrollFlags::FOCUS, None);
+        if store.n_items() > 0 {
+            column_view.scroll_to(store.n_items() - 1, None, ListScrollFlags::FOCUS, None);
+        }
     } else if closest.type_().name() == "GtkColumnViewRowWidget" {
         let Some(index) = find_index(store, &closest) else {
             return false;

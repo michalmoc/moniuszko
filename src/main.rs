@@ -2,13 +2,14 @@ mod config;
 mod constants;
 pub mod database;
 mod media_library;
+mod player;
 mod playlist;
 
 use crate::config::{Config, ConfigPtr};
 use crate::constants::{APP_ID, APP_NAME};
 use crate::database::{DatabasePtr, Scanner, ScannerPtr};
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, glib};
+use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
 use gtk4::{Button, Orientation, Paned};
 use std::fs;
@@ -31,39 +32,47 @@ fn main() -> glib::ExitCode {
     let scanner_ptr = Arc::new(RwLock::new(scanner));
     let database_ptr = Arc::new(RwLock::new(database));
 
-    let application = Application::builder().application_id(APP_ID).build();
+    let application = adw::Application::builder().application_id(APP_ID).build();
 
     application.connect_activate(move |a| build_ui(a, &database_ptr, &scanner_ptr, &config_ptr));
 
     application.run()
 }
 
-fn build_ui(app: &Application, database: &DatabasePtr, scanner: &ScannerPtr, config: &ConfigPtr) {
+fn build_ui(
+    app: &adw::Application,
+    database: &DatabasePtr,
+    scanner: &ScannerPtr,
+    config: &ConfigPtr,
+) {
     let window = ApplicationWindow::builder()
         .application(app)
         .title(APP_NAME)
-        .default_width(350)
-        .default_height(70)
+        .default_width(640)
+        .default_height(480)
         .build();
 
     let playlist = playlist::Ui::new(database);
     let playlist_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
-        .min_content_width(360)
+        .min_content_width(120)
         .child(&playlist.widget())
         .vexpand(true)
         .hexpand(true)
         .build();
 
+    let player = player::Ui::new();
+
     let box_ = gtk4::Box::new(Orientation::Vertical, 0);
     box_.append(&playlist_sw);
+    box_.append(&player.widget());
 
     let media_library = media_library::Ui::new(database);
     media_library.repopulate(database);
     media_library.widget().set_vexpand(true);
     let media_library_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
-        .min_content_width(360)
+        .min_content_width(120)
         .child(&media_library.widget())
         .vexpand(true)
         .hexpand(false)
@@ -137,6 +146,7 @@ fn refresh_button_cb(
 
         media_library_clone.repopulate(&database_clone2);
         playlist_clone.refresh(&database_clone2);
+
         button_clone.set_sensitive(enable_button);
     });
 }
