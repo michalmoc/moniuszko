@@ -16,6 +16,7 @@ mod imp {
     use gtk4::subclass::prelude::DerivedObjectProperties;
     use gtk4::subclass::prelude::{ObjectImpl, ObjectSubclass};
     use std::cell::{Cell, RefCell};
+    use std::path::PathBuf;
 
     #[derive(Default, Properties)]
     #[properties(wrapper_type = super::PlaylistItem)]
@@ -25,6 +26,12 @@ mod imp {
 
         #[property(get, set)]
         stored_track: Cell<TrackId>,
+
+        #[property(get, set)]
+        is_playing: Cell<bool>,
+
+        #[property(get, set)]
+        path: RefCell<PathBuf>,
 
         #[property(get, set)]
         position: Cell<u32>,
@@ -56,12 +63,14 @@ impl PlaylistItem {
         let obj: Self = Object::builder()
             .property("uuid", PlaylistEntryUuid(Uuid::new_v4()))
             .property("stored_track", track_id)
+            .property("is_playing", false)
             .build();
         obj.set_data(database);
         obj
     }
 
     pub fn set_data(&self, database: &Database) {
+        self.set_path(database[self.stored_track()].path.clone());
         self.set_position(database[self.stored_track()].position);
         self.set_name(database[self.stored_track()].title.to_string());
         self.set_album(

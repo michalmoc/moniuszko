@@ -11,7 +11,8 @@ use crate::database::{DatabasePtr, Scanner, ScannerPtr};
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
-use gtk4::{Button, Orientation, Paned};
+use gtk4::gdk::Display;
+use gtk4::{Button, CssProvider, Orientation, Paned};
 use std::fs;
 use std::fs::File;
 use std::ops::Deref;
@@ -34,9 +35,22 @@ fn main() -> glib::ExitCode {
 
     let application = adw::Application::builder().application_id(APP_ID).build();
 
+    application.connect_startup(|_| load_css());
     application.connect_activate(move |a| build_ui(a, &database_ptr, &scanner_ptr, &config_ptr));
 
     application.run()
+}
+
+fn load_css() {
+    let provider = CssProvider::new();
+    provider.load_from_string(include_str!("style.css"));
+
+    // Add the provider to the default screen
+    gtk::style_context_add_provider_for_display(
+        &Display::default().expect("Could not connect to a display."),
+        &provider,
+        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
 }
 
 fn build_ui(
@@ -61,7 +75,7 @@ fn build_ui(
         .hexpand(true)
         .build();
 
-    let player = player::Ui::new();
+    let player = player::Ui::new(playlist.store());
 
     let box_ = gtk4::Box::new(Orientation::Vertical, 0);
     box_.append(&playlist_sw);

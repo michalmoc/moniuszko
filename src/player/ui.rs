@@ -1,6 +1,9 @@
+use crate::player::playback_state::PlaybackState;
+use crate::playlist::PlaylistItem;
 use adw::ffi::AdwToggle;
-use gio::prelude::Cast;
-use gtk4::prelude::{BoxExt, WidgetExt};
+use adw::glib::Propagation;
+use gio::prelude::{Cast, ListModelExt};
+use gtk4::prelude::{BoxExt, ButtonExt, CastNone, MediaStreamExt, ObjectExt, RangeExt, WidgetExt};
 use gtk4::{Adjustment, Button, Label, Orientation, Scale, Widget};
 
 #[derive(Clone)]
@@ -9,14 +12,46 @@ pub struct Ui {
 }
 
 impl Ui {
-    pub fn new() -> Self {
-        let time_elapsed = Label::new(Some("00:00"));
+    pub fn new(playlist: &gio::ListStore) -> Self {
+        let playback_state = PlaybackState::new();
 
-        let adjustment = Adjustment::new(0.0, 0.0, 10.0, 0.1, 0.5, 1.0);
+        let time_elapsed = Label::new(Some("00:00"));
+        time_elapsed.add_css_class("timestamp");
+        playback_state
+            .bind_property("progress", &time_elapsed, "label")
+            .transform_to(|_, n: i64| {
+                Some(format!("{:0>2}:{:0>2}", n / 60000000, n / 1000000 % 60))
+            })
+            .sync_create()
+            .build();
+
+        let adjustment = Adjustment::new(0.0, 0.0, 1.0, 1000000.0, 1000000.0, 1.0);
         let progress = Scale::new(Orientation::Horizontal, Some(&adjustment));
         progress.set_hexpand(true);
+        playback_state
+            .bind_property("progress", &progress.adjustment(), "value")
+            .sync_create()
+            .build();
+        playback_state
+            .bind_property("duration", &progress.adjustment(), "upper")
+            .sync_create()
+            .build();
+        let playback_state_clone = playback_state.clone();
+        progress.connect_change_value(move |_, _, value| {
+            println!("called! {}", value);
+            playback_state_clone.seek(value as i64);
+            Propagation::Proceed
+        });
 
-        let time_full = Label::new(Some("01:00"));
+        let time_full = Label::new(Some("00:00"));
+        time_full.add_css_class("timestamp");
+        playback_state
+            .bind_property("duration", &time_full, "label")
+            .transform_to(|_, n: i64| {
+                Some(format!("{:0>2}:{:0>2}", n / 60000000, n / 1000000 % 60))
+            })
+            .sync_create()
+            .build();
 
         let progress_box = gtk4::Box::new(Orientation::Horizontal, 5);
         progress_box.append(&time_elapsed);
@@ -26,8 +61,27 @@ impl Ui {
         let volume_button = Button::from_icon_name("multimedia-volume-control");
 
         let back_button = Button::from_icon_name("media-skip-backward");
-        let play_button = Button::from_icon_name("media-playback-start");
+
+        let play_button = Button::new();
+        let playlist_clone = playlist.clone();
+        let playback_state_clone = playback_state.clone();
+        play_button.connect_clicked(move |_| on_play(&playlist_clone, &playback_state_clone));
+        playback_state
+            .bind_property("is_playing", &play_button, "icon_name")
+            .transform_to(|_, b: bool| {
+                if b {
+                    Some("media-playback-pause")
+                } else {
+                    Some("media-playback-start")
+                }
+            })
+            .sync_create()
+            .build();
+
         let forward_button = Button::from_icon_name("media-skip-forward");
+        let playlist_clone = playlist.clone();
+        let playback_state_clone = playback_state.clone();
+        forward_button.connect_clicked(move |_| on_next(&playlist_clone, &playback_state_clone));
 
         let player_control_box = gtk4::Box::new(Orientation::Horizontal, 0);
         player_control_box.append(&back_button);
@@ -55,6 +109,7 @@ impl Ui {
         control_box.set_end_widget(Some(&repeat_choice));
 
         let main_box = gtk4::Box::new(Orientation::Vertical, 10);
+        main_box.set_widget_name("player_control_main_box");
         main_box.append(&progress_box);
         main_box.append(&control_box);
 
@@ -63,5 +118,33 @@ impl Ui {
 
     pub fn widget(&self) -> Widget {
         self.widget.clone().upcast()
+    }
+}
+
+fn on_play(playlist: &gio::ListStore, playback_state: &PlaybackState) {
+    if playback_state.current().is_none() {
+        if playlist.n_items() > 0 {
+            let item = playlist.item(0).and_downcast::<PlaylistItem>().unwrap();
+            playback_state.set_current(Some(item));
+            playback_state.set_is_playing(true);
+        }
+    } else {
+        playback_state.set_is_playing(!playback_state.is_playing());
+    }
+}
+
+fn on_next(playlist: &gio::ListStore, playback_state: &PlaybackState) {
+    if let Some(current) = playback_state.current() {
+        if let Some(idx) = playlist.find(&current) {
+            // playlist.n_items() != 0 because current present
+            let next = (idx + 1) % playlist.n_items();
+            playback_state.set_current(Some(playlist.item(next).and_downcast().unwrap()));
+            playback_state.set_is_playing(true);
+        } else {
+            playback_state.set_current(None);
+            on_play(playlist, playback_state);
+        }
+    } else {
+        on_play(playlist, playback_state);
     }
 }

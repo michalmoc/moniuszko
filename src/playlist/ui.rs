@@ -8,7 +8,7 @@ use gtk4::glib::{Object, Propagation, Value, Variant};
 use gtk4::graphene::Point;
 use gtk4::prelude::{
     BoxExt, Cast, CastNone, ContentProviderExtManual, DragExt, EventControllerExt, ListItemExt,
-    ObjectExt, SelectionModelExt, StaticType, WidgetExt,
+    ObjectExt, SelectionModelExt, StaticType, ToValue, WidgetExt,
 };
 use gtk4::{
     CallbackAction, ColumnView, ColumnViewColumn, DragSource, DropTarget, KeyvalTrigger, Label,
@@ -71,6 +71,7 @@ impl Ui {
         view.add_controller(drag_source);
         view.add_controller(drop_target);
         view.add_controller(shortcut_controller);
+        view.add_css_class("data-table");
         view.append_column(&column1);
         view.append_column(&column2);
         view.append_column(&column3);
@@ -91,6 +92,10 @@ impl Ui {
 
     pub fn widget(&self) -> Widget {
         self.widget.clone().upcast()
+    }
+
+    pub fn store(&self) -> &gio::ListStore {
+        &self.store
     }
 }
 
@@ -124,6 +129,17 @@ fn tree_bind1(_factory: &SignalListItemFactory, list_item: &Object) {
         .bind_property("position", &label, "label")
         .sync_create()
         .build();
+    dataobj
+        .bind_property("is_playing", &label, "css-classes")
+        .transform_to(|_, v: bool| {
+            if v {
+                Some(["current"].to_value())
+            } else {
+                Some([].to_value())
+            }
+        })
+        .sync_create()
+        .build();
 }
 
 fn tree_setup2(_factory: &SignalListItemFactory, list_item: &Object) {
@@ -145,6 +161,17 @@ fn tree_bind2(_factory: &SignalListItemFactory, list_item: &Object) {
         .bind_property("name", &label, "label")
         .sync_create()
         .build();
+    dataobj
+        .bind_property("is_playing", &label, "css-classes")
+        .transform_to(|_, v: bool| {
+            if v {
+                Some(["current"].to_value())
+            } else {
+                Some([].to_value())
+            }
+        })
+        .sync_create()
+        .build();
 }
 
 fn tree_setup3(_factory: &SignalListItemFactory, list_item: &Object) {
@@ -163,6 +190,17 @@ fn tree_bind3(_factory: &SignalListItemFactory, list_item: &Object) {
     let dataobj = list_item.item().and_downcast::<PlaylistItem>().unwrap();
     dataobj
         .bind_property("album", &label, "label")
+        .sync_create()
+        .build();
+    dataobj
+        .bind_property("is_playing", &label, "css-classes")
+        .transform_to(|_, v: bool| {
+            if v {
+                Some(["current"].to_value())
+            } else {
+                Some([].to_value())
+            }
+        })
         .sync_create()
         .build();
 }

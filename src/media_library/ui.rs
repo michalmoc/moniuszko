@@ -35,6 +35,7 @@ impl Ui {
 
         let tree = ListView::new(Some(selection), Some(factory));
         tree.add_controller(drag_source);
+        tree.add_css_class("navigation-sidebar");
 
         Self {
             store,

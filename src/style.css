@@ -1,0 +1,12 @@
+#player_control_main_box {
+    margin: 10pt;
+}
+
+label.current {
+    font-weight: bold;
+    font-style: italic;
+}
+
+.timestamp {
+    font-family: monospace;
+}
