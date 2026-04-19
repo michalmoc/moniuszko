@@ -90,6 +90,10 @@ impl Ui {
         }
     }
 
+    pub fn connect_activate<F: Fn(u32) + 'static>(&self, f: F) {
+        self.widget.connect_activate(move |_, p| f(p));
+    }
+
     pub fn widget(&self) -> Widget {
         self.widget.clone().upcast()
     }

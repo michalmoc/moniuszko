@@ -9,6 +9,8 @@ use gtk4::{Adjustment, Button, Label, Orientation, Scale, Widget};
 #[derive(Clone)]
 pub struct Ui {
     widget: gtk4::Box,
+    playback_state: PlaybackState,
+    store: gio::ListStore,
 }
 
 impl Ui {
@@ -23,7 +25,7 @@ impl Ui {
         });
 
         let time_elapsed = Label::new(Some("00:00"));
-        time_elapsed.add_css_class("timestamp");
+        time_elapsed.add_css_class("numeric");
         playback_state
             .bind_property("progress", &time_elapsed, "label")
             .transform_to(timestamp_to_text)
@@ -48,7 +50,7 @@ impl Ui {
         });
 
         let time_full = Label::new(Some("00:00"));
-        time_full.add_css_class("timestamp");
+        time_full.add_css_class("numeric");
         playback_state
             .bind_property("duration", &time_full, "label")
             .transform_to(timestamp_to_text)
@@ -61,13 +63,17 @@ impl Ui {
         progress_box.append(&time_full);
 
         let volume_button = Button::from_icon_name("multimedia-volume-control");
+        volume_button.add_css_class("flat");
+        volume_button.add_css_class("dimmed");
 
         let back_button = Button::from_icon_name("media-skip-backward");
+        back_button.add_css_class("suggested-action");
         let playlist_clone = playlist.clone();
         let playback_state_clone = playback_state.clone();
         back_button.connect_clicked(move |_| on_previous(&playlist_clone, &playback_state_clone));
 
         let play_button = Button::new();
+        play_button.add_css_class("suggested-action");
         let playlist_clone = playlist.clone();
         let playback_state_clone = playback_state.clone();
         play_button.connect_clicked(move |_| on_play(&playlist_clone, &playback_state_clone));
@@ -84,11 +90,13 @@ impl Ui {
             .build();
 
         let forward_button = Button::from_icon_name("media-skip-forward");
+        forward_button.add_css_class("suggested-action");
         let playlist_clone = playlist.clone();
         let playback_state_clone = playback_state.clone();
         forward_button.connect_clicked(move |_| on_next(&playlist_clone, &playback_state_clone));
 
         let player_control_box = gtk4::Box::new(Orientation::Horizontal, 0);
+        player_control_box.add_css_class("linked");
         player_control_box.append(&back_button);
         player_control_box.append(&play_button);
         player_control_box.append(&forward_button);
@@ -103,6 +111,8 @@ impl Ui {
         randomize.set_icon_name(Some("media-playlist-shuffle"));
 
         let repeat_choice = adw::ToggleGroup::new();
+        repeat_choice.add_css_class("flat");
+        repeat_choice.add_css_class("dimmed");
         repeat_choice.set_homogeneous(true);
         repeat_choice.add(repeat_single);
         repeat_choice.add(repeat_all);
@@ -125,7 +135,19 @@ impl Ui {
         main_box.append(&progress_box);
         main_box.append(&control_box);
 
-        Self { widget: main_box }
+        Self {
+            widget: main_box,
+            playback_state,
+            store: playlist.clone(),
+        }
+    }
+
+    pub fn play(&self, pos: u32) {
+        if pos < self.store.n_items() {
+            self.playback_state
+                .set_current(self.store.item(pos).and_downcast());
+            self.playback_state.set_playing(true);
+        }
     }
 
     pub fn widget(&self) -> Widget {

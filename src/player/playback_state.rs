@@ -1,4 +1,3 @@
-use crate::player::repeat_mode::RepeatMode;
 use crate::playlist::PlaylistItem;
 use gtk4::glib::Object;
 use gtk4::prelude::{MediaStreamExt, ObjectExt};

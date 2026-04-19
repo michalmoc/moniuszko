@@ -19,8 +19,8 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
-// * play by clicking on playlist entry
 // * add to playlist by clicking on library entry
+// * align left playlist cells
 // * save state of playlist
 // * save state of window and library size
 // * cover images in library
@@ -35,6 +35,7 @@ use std::sync::{Arc, RwLock};
 // * mpris
 // * system tray
 // * enable tray in app settings
+// * right-click menu on playlist and library
 
 // TODO: for 1.2
 // * many playlists
@@ -105,6 +106,9 @@ fn build_ui(
         .build();
 
     let player = player::Ui::new(playlist.store());
+
+    let player_clone = player.clone();
+    playlist.connect_activate(move |p| player_clone.play(p));
 
     let box_ = gtk4::Box::new(Orientation::Vertical, 0);
     box_.append(&playlist_sw);
