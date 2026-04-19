@@ -103,9 +103,16 @@ impl Ui {
         randomize.set_icon_name(Some("media-playlist-shuffle"));
 
         let repeat_choice = adw::ToggleGroup::new();
+        repeat_choice.set_homogeneous(true);
         repeat_choice.add(repeat_single);
         repeat_choice.add(repeat_all);
         repeat_choice.add(randomize);
+        repeat_choice.set_active(1);
+        repeat_choice
+            .bind_property("active", &playback_state, "repeat_mode")
+            .bidirectional()
+            .sync_create()
+            .build();
 
         let control_box = gtk4::CenterBox::new();
         control_box.set_hexpand(true);
@@ -146,7 +153,7 @@ fn on_next(playlist: &gio::ListStore, playback_state: &PlaybackState) {
     if let Some(current) = playback_state.current() {
         if let Some(idx) = playlist.find(&current) {
             // playlist.n_items() != 0 because current present
-            let next = (idx + 1) % playlist.n_items();
+            let next = playback_state.repeat_mode().next(idx, playlist.n_items());
             playback_state.set_current(Some(playlist.item(next).and_downcast().unwrap()));
             playback_state.set_playing(true);
         } else {
@@ -165,7 +172,9 @@ fn on_previous(playlist: &gio::ListStore, playback_state: &PlaybackState) {
                 playback_state.seek(0);
             } else {
                 // playlist.n_items() != 0 because current present
-                let next = (idx + playlist.n_items() - 1) % playlist.n_items();
+                let next = playback_state
+                    .repeat_mode()
+                    .previous(idx, playlist.n_items());
                 playback_state.set_current(Some(playlist.item(next).and_downcast().unwrap()));
                 playback_state.set_playing(true);
             }

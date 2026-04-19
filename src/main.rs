@@ -19,7 +19,6 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
-// * next modes
 // * play by clicking on playlist entry
 // * add to playlist by clicking on library entry
 // * save state of playlist
@@ -29,7 +28,7 @@ use std::sync::{Arc, RwLock};
 // * library grouping modes
 // * library search
 // * volume control
-// * app settings: media directory, random mode, full rescan
+// * app settings: media directory, full rescan
 
 // TODO: for 1.1
 // * translations
@@ -41,6 +40,7 @@ use std::sync::{Arc, RwLock};
 // * many playlists
 // * save/load playlist
 // * undo/redo playlist changes
+// * random modes
 
 // TODO: for 1.3
 // * panel with details of current piece (including lyrics)

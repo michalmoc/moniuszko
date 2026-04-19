@@ -1,3 +1,4 @@
+use crate::player::repeat_mode::RepeatMode;
 use crate::playlist::PlaylistItem;
 use gtk4::glib::Object;
 use gtk4::prelude::{MediaStreamExt, ObjectExt};
@@ -5,28 +6,32 @@ use gtk4::subclass::prelude::ObjectSubclassIsExt;
 use gtk4::{MediaFile, glib};
 
 mod imp {
+    use crate::player::repeat_mode::RepeatMode;
     use crate::playlist::PlaylistItem;
     use gtk4::glib::{Object, Properties};
     use gtk4::prelude::ObjectExt;
     use gtk4::subclass::prelude::DerivedObjectProperties;
     use gtk4::subclass::prelude::{ObjectImpl, ObjectSubclass};
     use gtk4::{MediaFile, glib};
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
 
     #[derive(Default, Properties)]
     #[properties(wrapper_type = super::PlaybackState)]
     pub struct PlaybackState {
         #[property(get, set)]
-        pub playing: RefCell<bool>,
+        pub playing: Cell<bool>,
 
         #[property(get, set)]
-        pub ended: RefCell<bool>,
+        pub ended: Cell<bool>,
 
         #[property(get, set)]
-        pub progress: RefCell<i64>,
+        pub progress: Cell<i64>,
 
         #[property(get, set)]
-        pub duration: RefCell<i64>,
+        pub duration: Cell<i64>,
+
+        #[property(get, set, default)]
+        pub repeat_mode: Cell<RepeatMode>,
 
         pub current: RefCell<Option<PlaylistItem>>,
         pub medium: RefCell<Option<MediaFile>>,
@@ -81,6 +86,7 @@ impl PlaybackState {
     fn bind_medium(&self) {
         if let Some(medium) = self.imp().medium.borrow().as_ref() {
             self.bind_property("playing", medium, "playing")
+                .bidirectional()
                 .sync_create()
                 .build();
             medium
