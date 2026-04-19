@@ -19,7 +19,6 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
-// * align left playlist cells
 // * save state of playlist
 // * save state of window and library size
 // * cover images in library

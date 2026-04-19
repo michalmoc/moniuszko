@@ -11,8 +11,8 @@ use gtk4::prelude::{
     ObjectExt, SelectionModelExt, StaticType, ToValue, WidgetExt,
 };
 use gtk4::{
-    CallbackAction, ColumnView, ColumnViewColumn, DragSource, DropTarget, KeyvalTrigger, Label,
-    ListScrollFlags, MultiSelection, PickFlags, Shortcut, ShortcutController,
+    Align, CallbackAction, ColumnView, ColumnViewColumn, DragSource, DropTarget, KeyvalTrigger,
+    Label, ListScrollFlags, MultiSelection, PickFlags, Shortcut, ShortcutController,
     SignalListItemFactory, Widget, gdk, gio,
 };
 use std::collections::HashSet;
@@ -33,16 +33,19 @@ impl Ui {
         factory1.connect_setup(tree_setup1);
         factory1.connect_bind(tree_bind1);
         let column1 = ColumnViewColumn::new(Some("#"), Some(factory1));
+        column1.set_resizable(true);
 
         let factory2 = SignalListItemFactory::new();
         factory2.connect_setup(tree_setup2);
         factory2.connect_bind(tree_bind2);
         let column2 = ColumnViewColumn::new(Some("title"), Some(factory2));
+        column2.set_resizable(true);
 
         let factory3 = SignalListItemFactory::new();
         factory3.connect_setup(tree_setup3);
         factory3.connect_bind(tree_bind3);
         let column3 = ColumnViewColumn::new(Some("album"), Some(factory3));
+        column3.set_resizable(true);
 
         let drop_target = DropTarget::new(ObjectIds::static_type(), DragAction::all());
         let store_clone = store.clone();
@@ -72,7 +75,6 @@ impl Ui {
         view.add_controller(drag_source);
         view.add_controller(drop_target);
         view.add_controller(shortcut_controller);
-        view.add_css_class("data-table");
         view.append_column(&column1);
         view.append_column(&column2);
         view.append_column(&column3);
@@ -128,9 +130,12 @@ fn tree_setup1(_factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let label = Label::new(None);
+    label.set_halign(Align::End);
+    label.set_hexpand(true);
 
     let box_ = BoxWithPlaylistEntry::new();
     box_.append(&label);
+    box_.add_css_class("numeric");
 
     list_item.set_child(Some(&box_));
 }
@@ -171,6 +176,7 @@ fn tree_setup2(_factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let label = Label::new(None);
+    label.set_halign(Align::Start);
 
     list_item.set_child(Some(&label));
 }
@@ -203,6 +209,7 @@ fn tree_setup3(_factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let label = Label::new(None);
+    label.set_halign(Align::Start);
 
     list_item.set_child(Some(&label));
 }
