@@ -1,4 +1,4 @@
-use crate::database::{DatabasePtr, ObjectId, TrackId};
+use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
 use crate::playlist::ObjectIds;
 use crate::playlist::box_with_playlist_entry::BoxWithPlaylistEntry;
 use crate::playlist::ui_item::PlaylistItem;
@@ -21,6 +21,7 @@ use std::collections::HashSet;
 pub struct Ui {
     store: gio::ListStore,
     widget: ColumnView,
+    database: DatabasePtr,
 }
 
 impl Ui {
@@ -79,6 +80,7 @@ impl Ui {
         Self {
             store,
             widget: view,
+            database: database.clone(),
         }
     }
 
@@ -92,6 +94,25 @@ impl Ui {
 
     pub fn connect_activate<F: Fn(u32) + 'static>(&self, f: F) {
         self.widget.connect_activate(move |_, p| f(p));
+    }
+
+    pub fn append(&self, object_id: ObjectId) {
+        let db = self.database.read().unwrap();
+
+        let tracks = get_tracks(&db, object_id);
+        self.widget.model().unwrap().unselect_all();
+
+        for track in tracks {
+            self.store.append(&PlaylistItem::new(track, &db));
+            self.widget
+                .model()
+                .unwrap()
+                .select_item(self.store.n_items() - 1, false);
+        }
+        if self.store.n_items() > 0 {
+            self.widget
+                .scroll_to(self.store.n_items() - 1, None, ListScrollFlags::FOCUS, None);
+        }
     }
 
     pub fn widget(&self) -> Widget {
@@ -278,18 +299,22 @@ fn get_dropped_tracks(value: &Value, database: &DatabasePtr) -> Vec<TrackId> {
     let database = database.read().unwrap();
 
     for item in dropped {
-        match item {
-            ObjectId::None => {}
-            ObjectId::TrackId(track_id) => {
-                tracks.push(track_id);
-            }
-            ObjectId::AlbumId(album_id) => {
-                tracks.extend(database[album_id].tracks.values());
-            }
-        }
+        tracks.extend(get_tracks(&database, item));
     }
 
     tracks
+}
+
+fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
+    match item {
+        ObjectId::None => {
+            vec![]
+        }
+        ObjectId::TrackId(track_id) => {
+            vec![track_id]
+        }
+        ObjectId::AlbumId(album_id) => database[album_id].tracks.values().copied().collect(),
+    }
 }
 
 fn find_closest(x: f64, y: f64, column_view: &Widget) -> Widget {

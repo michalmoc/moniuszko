@@ -19,7 +19,6 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
-// * add to playlist by clicking on library entry
 // * align left playlist cells
 // * save state of playlist
 // * save state of window and library size
@@ -117,6 +116,11 @@ fn build_ui(
     let media_library = media_library::Ui::new(database);
     media_library.repopulate(database);
     media_library.widget().set_vexpand(true);
+    let playlist_clone = playlist.clone();
+    media_library.connect_activate(move |obj| {
+        playlist_clone.append(obj);
+    });
+
     let media_library_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .min_content_width(120)

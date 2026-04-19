@@ -13,7 +13,8 @@ use gtk4::{
 
 #[derive(Clone)]
 pub struct Ui {
-    store: gio::ListStore,
+    top_store: gio::ListStore,
+    tree_store: TreeListModel,
     widget: ListView,
 }
 
@@ -29,7 +30,7 @@ impl Ui {
             create(i, &database_clone)
         });
 
-        let selection = MultiSelection::new(Some(model));
+        let selection = MultiSelection::new(Some(model.clone()));
         let drag_source = DragSource::new();
         drag_source.connect_prepare(drag_prepare);
 
@@ -38,9 +39,22 @@ impl Ui {
         tree.add_css_class("navigation-sidebar");
 
         Self {
-            store,
+            top_store: store,
             widget: tree,
+            tree_store: model,
         }
+    }
+
+    pub fn connect_activate<F>(&self, f: F)
+    where
+        F: Fn(ObjectId) + 'static,
+    {
+        let store = self.tree_store.clone();
+        self.widget.connect_activate(move |_, p| {
+            let row = store.item(p).and_downcast::<TreeListRow>().unwrap();
+            let item = row.item().and_downcast::<MediaListItem>().unwrap();
+            f(item.stored_object());
+        });
     }
 
     pub fn widget(&self) -> Widget {
@@ -48,7 +62,7 @@ impl Ui {
     }
 
     pub fn repopulate(&self, database: &DatabasePtr) {
-        self.store.remove_all();
+        self.top_store.remove_all();
 
         let db = database.read().unwrap();
 
@@ -60,7 +74,8 @@ impl Ui {
         albums.sort_by_key(|k| k.1);
 
         for (album_id, _) in albums {
-            self.store.append(&MediaListItem::new_album(album_id, &db));
+            self.top_store
+                .append(&MediaListItem::new_album(album_id, &db));
         }
     }
 }
