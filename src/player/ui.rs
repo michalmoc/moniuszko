@@ -63,6 +63,9 @@ impl Ui {
         let volume_button = Button::from_icon_name("multimedia-volume-control");
 
         let back_button = Button::from_icon_name("media-skip-backward");
+        let playlist_clone = playlist.clone();
+        let playback_state_clone = playback_state.clone();
+        back_button.connect_clicked(move |_| on_previous(&playlist_clone, &playback_state_clone));
 
         let play_button = Button::new();
         let playlist_clone = playlist.clone();
@@ -146,6 +149,26 @@ fn on_next(playlist: &gio::ListStore, playback_state: &PlaybackState) {
             let next = (idx + 1) % playlist.n_items();
             playback_state.set_current(Some(playlist.item(next).and_downcast().unwrap()));
             playback_state.set_playing(true);
+        } else {
+            playback_state.set_current(None);
+            on_play(playlist, playback_state);
+        }
+    } else {
+        on_play(playlist, playback_state);
+    }
+}
+
+fn on_previous(playlist: &gio::ListStore, playback_state: &PlaybackState) {
+    if let Some(current) = playback_state.current() {
+        if let Some(idx) = playlist.find(&current) {
+            if playback_state.progress() * 10 > playback_state.duration() {
+                playback_state.seek(0);
+            } else {
+                // playlist.n_items() != 0 because current present
+                let next = (idx + playlist.n_items() - 1) % playlist.n_items();
+                playback_state.set_current(Some(playlist.item(next).and_downcast().unwrap()));
+                playback_state.set_playing(true);
+            }
         } else {
             playback_state.set_current(None);
             on_play(playlist, playback_state);

@@ -19,7 +19,6 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
-// * previous
 // * next modes
 // * play by clicking on playlist entry
 // * add to playlist by clicking on library entry
