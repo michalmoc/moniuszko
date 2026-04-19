@@ -5,4 +5,4 @@ mod ui_item;
 
 pub use dnd_item::ObjectIds;
 pub use ui::Ui;
-pub use ui_item::{PlaylistEntryUuid, PlaylistItem};
+pub use ui_item::PlaylistItem;

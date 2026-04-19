@@ -1,9 +1,9 @@
 use crate::player::playback_state::PlaybackState;
 use crate::playlist::PlaylistItem;
-use adw::ffi::AdwToggle;
 use adw::glib::Propagation;
 use gio::prelude::{Cast, ListModelExt};
-use gtk4::prelude::{BoxExt, ButtonExt, CastNone, MediaStreamExt, ObjectExt, RangeExt, WidgetExt};
+use gtk4::glib::Binding;
+use gtk4::prelude::{BoxExt, ButtonExt, CastNone, ObjectExt, RangeExt, WidgetExt};
 use gtk4::{Adjustment, Button, Label, Orientation, Scale, Widget};
 
 #[derive(Clone)]
@@ -14,14 +14,19 @@ pub struct Ui {
 impl Ui {
     pub fn new(playlist: &gio::ListStore) -> Self {
         let playback_state = PlaybackState::new();
+        let playlist_clone = playlist.clone();
+        let playback_state_clone = playback_state.clone();
+        playback_state.connect_ended_notify(move |_| {
+            if playback_state_clone.ended() {
+                on_next(&playlist_clone, &playback_state_clone)
+            }
+        });
 
         let time_elapsed = Label::new(Some("00:00"));
         time_elapsed.add_css_class("timestamp");
         playback_state
             .bind_property("progress", &time_elapsed, "label")
-            .transform_to(|_, n: i64| {
-                Some(format!("{:0>2}:{:0>2}", n / 60000000, n / 1000000 % 60))
-            })
+            .transform_to(timestamp_to_text)
             .sync_create()
             .build();
 
@@ -38,7 +43,6 @@ impl Ui {
             .build();
         let playback_state_clone = playback_state.clone();
         progress.connect_change_value(move |_, _, value| {
-            println!("called! {}", value);
             playback_state_clone.seek(value as i64);
             Propagation::Proceed
         });
@@ -47,9 +51,7 @@ impl Ui {
         time_full.add_css_class("timestamp");
         playback_state
             .bind_property("duration", &time_full, "label")
-            .transform_to(|_, n: i64| {
-                Some(format!("{:0>2}:{:0>2}", n / 60000000, n / 1000000 % 60))
-            })
+            .transform_to(timestamp_to_text)
             .sync_create()
             .build();
 
@@ -67,7 +69,7 @@ impl Ui {
         let playback_state_clone = playback_state.clone();
         play_button.connect_clicked(move |_| on_play(&playlist_clone, &playback_state_clone));
         playback_state
-            .bind_property("is_playing", &play_button, "icon_name")
+            .bind_property("playing", &play_button, "icon_name")
             .transform_to(|_, b: bool| {
                 if b {
                     Some("media-playback-pause")
@@ -121,15 +123,19 @@ impl Ui {
     }
 }
 
+fn timestamp_to_text(_: &Binding, n: i64) -> Option<String> {
+    Some(format!("{:0>2}:{:0>2}", n / 60000000, n / 1000000 % 60))
+}
+
 fn on_play(playlist: &gio::ListStore, playback_state: &PlaybackState) {
     if playback_state.current().is_none() {
         if playlist.n_items() > 0 {
             let item = playlist.item(0).and_downcast::<PlaylistItem>().unwrap();
             playback_state.set_current(Some(item));
-            playback_state.set_is_playing(true);
+            playback_state.set_playing(true);
         }
     } else {
-        playback_state.set_is_playing(!playback_state.is_playing());
+        playback_state.set_playing(!playback_state.playing());
     }
 }
 
@@ -139,7 +145,7 @@ fn on_next(playlist: &gio::ListStore, playback_state: &PlaybackState) {
             // playlist.n_items() != 0 because current present
             let next = (idx + 1) % playlist.n_items();
             playback_state.set_current(Some(playlist.item(next).and_downcast().unwrap()));
-            playback_state.set_is_playing(true);
+            playback_state.set_playing(true);
         } else {
             playback_state.set_current(None);
             on_play(playlist, playback_state);

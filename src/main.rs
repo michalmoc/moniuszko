@@ -18,6 +18,36 @@ use std::fs::File;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
+// TODO: for 1.0
+// * previous
+// * next modes
+// * play by clicking on playlist entry
+// * add to playlist by clicking on library entry
+// * save state of playlist
+// * save state of window and library size
+// * cover images in library
+// * artists shown in playlist
+// * library grouping modes
+// * library search
+// * volume control
+// * app settings: media directory, random mode, full rescan
+
+// TODO: for 1.1
+// * translations
+// * mpris
+// * system tray
+// * enable tray in app settings
+
+// TODO: for 1.2
+// * many playlists
+// * save/load playlist
+// * undo/redo playlist changes
+
+// TODO: for 1.3
+// * panel with details of current piece (including lyrics)
+// * separate library for audiobooks
+// * save last timestamp in audiobooks
+
 fn main() -> glib::ExitCode {
     let config = Config::load().unwrap();
 

@@ -1,4 +1,3 @@
-use crate::database::{AlbumId, Database, ObjectId, TrackId};
 use crate::playlist::PlaylistItem;
 use gtk4::glib::Object;
 use gtk4::prelude::{MediaStreamExt, ObjectExt};
@@ -9,16 +8,19 @@ mod imp {
     use crate::playlist::PlaylistItem;
     use gtk4::glib::{Object, Properties};
     use gtk4::prelude::ObjectExt;
-    use gtk4::subclass::prelude::{DerivedObjectProperties, ObjectImplExt, ObjectSubclassExt};
+    use gtk4::subclass::prelude::DerivedObjectProperties;
     use gtk4::subclass::prelude::{ObjectImpl, ObjectSubclass};
-    use gtk4::{MediaFile, MediaStream, glib};
-    use std::cell::{Cell, RefCell};
+    use gtk4::{MediaFile, glib};
+    use std::cell::RefCell;
 
     #[derive(Default, Properties)]
     #[properties(wrapper_type = super::PlaybackState)]
     pub struct PlaybackState {
         #[property(get, set)]
-        pub is_playing: RefCell<bool>,
+        pub playing: RefCell<bool>,
+
+        #[property(get, set)]
+        pub ended: RefCell<bool>,
 
         #[property(get, set)]
         pub progress: RefCell<i64>,
@@ -58,10 +60,9 @@ impl PlaybackState {
 
         if let Some(current) = self.imp().current.borrow().as_ref() {
             current.set_is_playing(true);
-
-            let file = gio::File::for_path(current.path());
-            let media = MediaFile::for_file(&file);
-            self.imp().medium.replace(Some(media));
+            self.imp()
+                .medium
+                .replace(Some(MediaFile::for_filename(current.path())));
         }
 
         self.bind_medium();
@@ -79,7 +80,7 @@ impl PlaybackState {
 
     fn bind_medium(&self) {
         if let Some(medium) = self.imp().medium.borrow().as_ref() {
-            self.bind_property("is_playing", medium, "playing")
+            self.bind_property("playing", medium, "playing")
                 .sync_create()
                 .build();
             medium
@@ -88,6 +89,10 @@ impl PlaybackState {
                 .build();
             medium
                 .bind_property("duration", self, "duration")
+                .sync_create()
+                .build();
+            medium
+                .bind_property("ended", self, "ended")
                 .sync_create()
                 .build();
         }
