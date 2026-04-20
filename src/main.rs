@@ -8,6 +8,7 @@ mod playlist;
 use crate::config::{Config, ConfigPtr};
 use crate::constants::{APP_ID, APP_NAME};
 use crate::database::{DatabasePtr, Scanner, ScannerPtr};
+use adw::glib::Propagation;
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
@@ -17,9 +18,7 @@ use std::fs;
 use std::fs::File;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
-
 // TODO: for 1.0
-// * save state of window and library size
 // * cover images in library
 // * artists shown in playlist
 // * library grouping modes
@@ -63,7 +62,8 @@ fn main() -> glib::ExitCode {
     let application = adw::Application::builder().application_id(APP_ID).build();
 
     application.connect_startup(|_| load_css());
-    application.connect_activate(move |a| build_ui(a, &database_ptr, &scanner_ptr, &config_ptr));
+    let config_clone = config_ptr.clone();
+    application.connect_activate(move |a| build_ui(a, &database_ptr, &scanner_ptr, &config_clone));
 
     application.run()
 }
@@ -89,8 +89,9 @@ fn build_ui(
     let window = ApplicationWindow::builder()
         .application(app)
         .title(APP_NAME)
-        .default_width(640)
-        .default_height(480)
+        .default_width(config.read().unwrap().window_width)
+        .default_height(config.read().unwrap().window_height)
+        .maximized(config.read().unwrap().window_maximized)
         .build();
 
     let playlist = playlist::Ui::new(database, config);
@@ -151,6 +152,18 @@ fn build_ui(
     let paned = Paned::new(Orientation::Horizontal);
     paned.set_start_child(Some(&media_library_box));
     paned.set_end_child(Some(&box_));
+
+    let config_clone = config.clone();
+    window.connect_close_request(move |window| {
+        let mut cfg = config_clone.write().unwrap();
+        cfg.window_width = window.width();
+        cfg.window_height = window.height();
+        cfg.window_maximized = window.is_maximized();
+        if let Err(e) = cfg.save() {
+            println!("Error saving config: {}", e);
+        }
+        Propagation::Proceed
+    });
 
     window.set_child(Some(&paned));
 

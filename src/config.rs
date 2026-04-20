@@ -1,18 +1,29 @@
 use crate::constants::APP_NAME;
+use crate::database::TrackId;
+use crate::playlist::PlaylistItem;
+use anyhow::anyhow;
 use dirs::{audio_dir, config_local_dir};
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
+    pub window_width: i32,
+    pub window_height: i32,
+    pub window_maximized: bool,
+
     pub media_path: PathBuf,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
+            window_width: 640,
+            window_height: 480,
+            window_maximized: false,
             media_path: audio_dir().unwrap(),
         }
     }
@@ -41,6 +52,19 @@ impl Config {
         } else {
             Ok(Default::default())
         }
+    }
+
+    pub fn save(&self) -> anyhow::Result<()> {
+        fs::create_dir_all(
+            Self::config_path()
+                .parent()
+                .ok_or(anyhow!("no config dir"))?,
+        )?;
+
+        let file = fs::File::create(Self::config_path())?;
+        serde_json::to_writer(file, self)?;
+
+        Ok(())
     }
 }
 
