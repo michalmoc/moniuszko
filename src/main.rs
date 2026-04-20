@@ -19,7 +19,6 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
-// * save state of playlist
 // * save state of window and library size
 // * cover images in library
 // * artists shown in playlist
@@ -94,7 +93,7 @@ fn build_ui(
         .default_height(480)
         .build();
 
-    let playlist = playlist::Ui::new(database);
+    let playlist = playlist::Ui::new(database, config);
     let playlist_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .min_content_width(120)

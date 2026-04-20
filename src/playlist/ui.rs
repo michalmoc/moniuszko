@@ -1,8 +1,9 @@
+use crate::config::ConfigPtr;
 use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
 use crate::playlist::ObjectIds;
 use crate::playlist::box_with_playlist_entry::BoxWithPlaylistEntry;
 use crate::playlist::ui_item::PlaylistItem;
-use gio::prelude::ListModelExt;
+use gio::prelude::{ListModelExt, ListModelExtManual};
 use gtk4::gdk::{Drag, DragAction, Key, ModifierType};
 use gtk4::glib::{Object, Propagation, Value, Variant};
 use gtk4::graphene::Point;
@@ -15,7 +16,9 @@ use gtk4::{
     Label, ListScrollFlags, MultiSelection, PickFlags, Shortcut, ShortcutController,
     SignalListItemFactory, Widget, gdk, gio,
 };
+use itertools::Itertools;
 use std::collections::HashSet;
+use std::fs;
 
 #[derive(Clone)]
 pub struct Ui {
@@ -25,8 +28,20 @@ pub struct Ui {
 }
 
 impl Ui {
-    pub fn new(database: &DatabasePtr) -> Self {
+    pub fn new(database: &DatabasePtr, config: &ConfigPtr) -> Self {
         let store = gio::ListStore::new::<PlaylistItem>();
+        let path = config.read().unwrap().playlists_path();
+        if let Ok(file) = fs::File::open(path) {
+            let tracks: Vec<TrackId> = serde_json::from_reader(file).unwrap();
+            let db = database.read().unwrap();
+            for track_id in tracks {
+                store.append(&PlaylistItem::new(track_id, &db));
+            }
+        }
+
+        let config_clone = config.clone();
+        store.connect_items_changed(move |list, _, _, _| save_playlist(list, &config_clone));
+
         let selection = MultiSelection::new(Some(store.clone()));
 
         let factory1 = SignalListItemFactory::new();
@@ -429,6 +444,26 @@ fn drag_end(source: &DragSource, drag: &Drag, remove: bool, store: &gio::ListSto
 
         if let Some(last) = last {
             column_view.scroll_to(last as u32, None, ListScrollFlags::FOCUS, None);
+        }
+    }
+}
+
+fn save_playlist(store: &gio::ListStore, config: &ConfigPtr) {
+    let config = config.read().unwrap();
+
+    fs::create_dir_all(config.playlists_path().parent().unwrap()).unwrap();
+    match fs::File::create(config.playlists_path()) {
+        Err(e) => {
+            println!("Error creating playlist file: {}", e);
+        }
+        Ok(file) => {
+            let playlist: Vec<TrackId> = store
+                .iter::<PlaylistItem>()
+                .filter_map(|i| i.ok())
+                .map(|p| p.stored_track())
+                .collect();
+
+            serde_json::to_writer(file, &playlist).unwrap();
         }
     }
 }
