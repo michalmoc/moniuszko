@@ -1,15 +1,18 @@
-use crate::database::{DatabasePtr, ObjectId};
+use crate::database::{AlbumId, Database, DatabasePtr, ObjectId};
 use crate::media_library::ui_item::MediaListItem;
 use crate::playlist::ObjectIds;
 use gio::prelude::{ListModelExt, ObjectExt, StaticType};
-use gtk4::glib::{Object, Value};
+use gtk4::glib::{Object, Value, spawn_future_local};
 use gtk4::prelude::{
-    Cast, CastNone, EventControllerExt, ListItemExt, SelectionModelExt, WidgetExt,
+    BoxExt, Cast, CastNone, EventControllerExt, ListItemExt, SelectionModelExt, WidgetExt,
 };
 use gtk4::{
-    DragSource, Label, ListView, MultiSelection, PickFlags, SignalListItemFactory, TreeExpander,
-    TreeListModel, TreeListRow, Widget, gdk, gio,
+    DragSource, Image, Label, ListView, MultiSelection, Orientation, PickFlags,
+    SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget, gdk, gio, glib,
 };
+use lofty::picture::PictureType;
+use lofty::prelude::TaggedFileExt;
+use lofty::probe::Probe;
 
 #[derive(Clone)]
 pub struct Ui {
@@ -22,7 +25,8 @@ impl Ui {
     pub fn new(database: &DatabasePtr) -> Self {
         let factory = SignalListItemFactory::new();
         factory.connect_setup(tree_setup);
-        factory.connect_bind(tree_bind);
+        let database_clone = database.clone();
+        factory.connect_bind(move |_, i| tree_bind(i, &database_clone));
 
         let store = gio::ListStore::new::<MediaListItem>();
         let database_clone = database.clone();
@@ -83,26 +87,55 @@ impl Ui {
 fn tree_setup(_factory: &SignalListItemFactory, list_item: &Object) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
-    let label = Label::new(None);
     let expander = TreeExpander::new();
-    expander.set_child(Some(&label));
     list_item.set_child(Some(&expander));
 }
 
-fn tree_bind(_factory: &SignalListItemFactory, list_item: &Object) {
+fn tree_bind(list_item: &Object, database: &DatabasePtr) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let expander = list_item.child().and_downcast::<TreeExpander>().unwrap();
-    let label = expander.child().and_downcast::<Label>().unwrap();
-
     let row = list_item.item().and_downcast::<TreeListRow>().unwrap();
     expander.set_list_row(Some(&row));
 
     let dataobj = row.item().and_downcast::<MediaListItem>().unwrap();
+
+    let label = Label::new(None);
     dataobj
         .bind_property("name", &label, "label")
         .sync_create()
         .build();
+
+    match dataobj.stored_object() {
+        ObjectId::None => {}
+        ObjectId::TrackId(_) => {
+            expander.set_child(Some(&label));
+        }
+        ObjectId::AlbumId(album) => {
+            let image = Image::new();
+            dataobj
+                .bind_property("image", &image, "paintable")
+                .sync_create()
+                .build();
+
+            if dataobj.image().is_none() {
+                let database_clone = database.clone();
+                spawn_future_local(async move {
+                    let img = gio::spawn_blocking(move || {
+                        load_image(album, &database_clone.read().unwrap())
+                    })
+                    .await
+                    .unwrap();
+                    dataobj.set_image(img);
+                });
+            }
+
+            let box_ = gtk4::Box::new(Orientation::Horizontal, 10);
+            box_.append(&image);
+            box_.append(&label);
+            expander.set_child(Some(&box_));
+        }
+    }
 }
 
 fn create(item: &Object, database: &DatabasePtr) -> Option<gio::ListModel> {
@@ -162,4 +195,21 @@ fn drag_prepare(drag_source: &DragSource, x: f64, y: f64) -> Option<gdk::Content
     let value = Value::from(object_ids);
     let content = gdk::ContentProvider::for_value(&value);
     Some(content)
+}
+
+fn load_image(album: AlbumId, db: &Database) -> Option<gdk::Texture> {
+    let any_track = db[album].tracks.values().next()?;
+    let path = &db[*any_track].path;
+
+    let tagged_file = Probe::open(path).ok()?.read().ok()?;
+
+    let tag = tagged_file
+        .primary_tag()
+        .or_else(|| tagged_file.first_tag())?;
+
+    let pic = tag
+        .get_picture_type(PictureType::CoverFront)
+        .or_else(|| tag.pictures().first())?;
+
+    gdk::Texture::from_bytes(&glib::Bytes::from(pic.data())).ok()
 }

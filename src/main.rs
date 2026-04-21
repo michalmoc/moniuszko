@@ -18,8 +18,8 @@ use std::fs;
 use std::fs::File;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
+
 // TODO: for 1.0
-// * cover images in library
 // * artists shown in playlist
 // * library grouping modes
 // * library search
