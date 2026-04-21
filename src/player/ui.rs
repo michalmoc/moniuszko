@@ -145,7 +145,7 @@ impl Ui {
     pub fn play(&self, pos: u32) {
         if pos < self.store.n_items() {
             self.playback_state
-                .set_current(self.store.item(pos).and_downcast());
+                .set_current(self.store.item(pos).and_downcast::<PlaylistItem>());
             self.playback_state.set_playing(true);
         }
     }
@@ -176,10 +176,10 @@ fn on_next(playlist: &gio::ListStore, playback_state: &PlaybackState) {
         if let Some(idx) = playlist.find(&current) {
             // playlist.n_items() != 0 because current present
             let next = playback_state.repeat_mode().next(idx, playlist.n_items());
-            playback_state.set_current(Some(playlist.item(next).and_downcast().unwrap()));
+            playback_state.set_current(playlist.item(next).and_downcast::<PlaylistItem>());
             playback_state.set_playing(true);
         } else {
-            playback_state.set_current(None);
+            playback_state.set_current(None::<PlaylistItem>);
             on_play(playlist, playback_state);
         }
     } else {
@@ -197,11 +197,11 @@ fn on_previous(playlist: &gio::ListStore, playback_state: &PlaybackState) {
                 let next = playback_state
                     .repeat_mode()
                     .previous(idx, playlist.n_items());
-                playback_state.set_current(Some(playlist.item(next).and_downcast().unwrap()));
+                playback_state.set_current(playlist.item(next).and_downcast::<PlaylistItem>());
                 playback_state.set_playing(true);
             }
         } else {
-            playback_state.set_current(None);
+            playback_state.set_current(None::<PlaylistItem>);
             on_play(playlist, playback_state);
         }
     } else {

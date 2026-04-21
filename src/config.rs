@@ -1,6 +1,4 @@
 use crate::constants::APP_NAME;
-use crate::database::TrackId;
-use crate::playlist::PlaylistItem;
 use anyhow::anyhow;
 use dirs::{audio_dir, config_local_dir};
 use serde::{Deserialize, Serialize};

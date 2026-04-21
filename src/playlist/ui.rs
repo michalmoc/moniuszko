@@ -16,7 +16,6 @@ use gtk4::{
     Label, ListScrollFlags, MultiSelection, PickFlags, Shortcut, ShortcutController,
     SignalListItemFactory, Widget, gdk, gio,
 };
-use itertools::Itertools;
 use std::collections::HashSet;
 use std::fs;
 
@@ -35,7 +34,9 @@ impl Ui {
             let tracks: Vec<TrackId> = serde_json::from_reader(file).unwrap();
             let db = database.read().unwrap();
             for track_id in tracks {
-                store.append(&PlaylistItem::new(track_id, &db));
+                if db.tracks.contains_key(&track_id) {
+                    store.append(&PlaylistItem::new(track_id, &db));
+                }
             }
         }
 
