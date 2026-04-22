@@ -45,24 +45,6 @@ impl Ui {
 
         let selection = MultiSelection::new(Some(store.clone()));
 
-        let factory1 = SignalListItemFactory::new();
-        factory1.connect_setup(tree_setup1);
-        factory1.connect_bind(tree_bind1);
-        let column1 = ColumnViewColumn::new(Some("#"), Some(factory1));
-        column1.set_resizable(true);
-
-        let factory2 = SignalListItemFactory::new();
-        factory2.connect_setup(tree_setup2);
-        factory2.connect_bind(tree_bind2);
-        let column2 = ColumnViewColumn::new(Some("title"), Some(factory2));
-        column2.set_resizable(true);
-
-        let factory3 = SignalListItemFactory::new();
-        factory3.connect_setup(tree_setup3);
-        factory3.connect_bind(tree_bind3);
-        let column3 = ColumnViewColumn::new(Some("album"), Some(factory3));
-        column3.set_resizable(true);
-
         let drop_target = DropTarget::new(ObjectIds::static_type(), DragAction::all());
         let store_clone = store.clone();
         let database_clone = database.clone();
@@ -91,9 +73,12 @@ impl Ui {
         view.add_controller(drag_source);
         view.add_controller(drop_target);
         view.add_controller(shortcut_controller);
-        view.append_column(&column1);
-        view.append_column(&column2);
-        view.append_column(&column3);
+
+        view.append_column(&Column::new_numeric("#", "position").build());
+        view.append_column(&Column::new_text("title", "name").build());
+        view.append_column(&Column::new_text("artists", "artists").build());
+        view.append_column(&Column::new_text("album", "album").build());
+        view.append_column(&Column::new_numeric("duration", "duration").build());
 
         Self {
             store,
@@ -142,115 +127,92 @@ impl Ui {
     }
 }
 
-fn tree_setup1(_factory: &SignalListItemFactory, list_item: &Object) {
-    let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
+struct Column {
+    title: String,
+    property: String,
 
-    let label = Label::new(None);
-    label.set_halign(Align::End);
-    label.set_hexpand(true);
-
-    let box_ = BoxWithPlaylistEntry::new();
-    box_.append(&label);
-    box_.add_css_class("numeric");
-
-    list_item.set_child(Some(&box_));
+    align: Align,
+    class: Option<String>,
 }
 
-fn tree_bind1(_factory: &SignalListItemFactory, list_item: &Object) {
-    let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
+impl Column {
+    fn new_text(title: &str, property: &str) -> Column {
+        Self {
+            title: title.to_string(),
+            property: property.to_string(),
+            align: Align::Start,
+            class: None,
+        }
+    }
 
-    let box_ = list_item
-        .child()
-        .and_downcast::<BoxWithPlaylistEntry>()
-        .unwrap();
-    let label = box_.first_child().and_downcast::<Label>().unwrap();
+    fn new_numeric(title: &str, property: &str) -> Column {
+        Self {
+            title: title.to_string(),
+            property: property.to_string(),
+            align: Align::End,
+            class: Some("numeric".to_string()),
+        }
+    }
 
-    let dataobj = list_item.item().and_downcast::<PlaylistItem>().unwrap();
+    fn build(self) -> ColumnViewColumn {
+        let factory = SignalListItemFactory::new();
+        factory.connect_setup(move |_, item| Self::setup(item, self.align, &self.class));
+        factory.connect_bind(move |_, item| Self::bind(item, &self.property));
 
-    dataobj
-        .bind_property("uuid", &box_, "playlist")
-        .sync_create()
-        .build();
-    dataobj
-        .bind_property("position", &label, "label")
-        .sync_create()
-        .build();
-    dataobj
-        .bind_property("is_playing", &label, "css-classes")
-        .transform_to(|_, v: bool| {
-            if v {
-                Some(["current"].to_value())
-            } else {
-                Some([].to_value())
-            }
-        })
-        .sync_create()
-        .build();
-}
+        let column = ColumnViewColumn::new(Some(&self.title), Some(factory));
+        column.set_resizable(true);
 
-fn tree_setup2(_factory: &SignalListItemFactory, list_item: &Object) {
-    let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
+        column
+    }
 
-    let label = Label::new(None);
-    label.set_halign(Align::Start);
+    fn setup(list_item: &Object, align: Align, class: &Option<String>) {
+        let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
-    list_item.set_child(Some(&label));
-}
+        let label = Label::new(None);
+        label.set_halign(align);
+        label.set_hexpand(true);
 
-fn tree_bind2(_factory: &SignalListItemFactory, list_item: &Object) {
-    let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
+        let box_ = BoxWithPlaylistEntry::new();
+        box_.append(&label);
 
-    let label = list_item.child().and_downcast::<Label>().unwrap();
+        if let Some(class) = &class {
+            box_.add_css_class(class);
+        }
 
-    let dataobj = list_item.item().and_downcast::<PlaylistItem>().unwrap();
+        list_item.set_child(Some(&box_));
+    }
 
-    dataobj
-        .bind_property("name", &label, "label")
-        .sync_create()
-        .build();
-    dataobj
-        .bind_property("is_playing", &label, "css-classes")
-        .transform_to(|_, v: bool| {
-            if v {
-                Some(["current"].to_value())
-            } else {
-                Some([].to_value())
-            }
-        })
-        .sync_create()
-        .build();
-}
+    fn bind(list_item: &Object, property: &str) {
+        let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
-fn tree_setup3(_factory: &SignalListItemFactory, list_item: &Object) {
-    let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
+        let box_ = list_item
+            .child()
+            .and_downcast::<BoxWithPlaylistEntry>()
+            .unwrap();
+        let label = box_.first_child().and_downcast::<Label>().unwrap();
 
-    let label = Label::new(None);
-    label.set_halign(Align::Start);
+        let dataobj = list_item.item().and_downcast::<PlaylistItem>().unwrap();
 
-    list_item.set_child(Some(&label));
-}
-
-fn tree_bind3(_factory: &SignalListItemFactory, list_item: &Object) {
-    let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
-
-    let label = list_item.child().and_downcast::<Label>().unwrap();
-
-    let dataobj = list_item.item().and_downcast::<PlaylistItem>().unwrap();
-    dataobj
-        .bind_property("album", &label, "label")
-        .sync_create()
-        .build();
-    dataobj
-        .bind_property("is_playing", &label, "css-classes")
-        .transform_to(|_, v: bool| {
-            if v {
-                Some(["current"].to_value())
-            } else {
-                Some([].to_value())
-            }
-        })
-        .sync_create()
-        .build();
+        dataobj
+            .bind_property("uuid", &box_, "playlist")
+            .sync_create()
+            .build();
+        dataobj
+            .bind_property(property, &label, "label")
+            .sync_create()
+            .build();
+        dataobj
+            .bind_property("is_playing", &label, "css-classes")
+            .transform_to(|_, v: bool| {
+                if v {
+                    Some(["current"].to_value())
+                } else {
+                    Some([].to_value())
+                }
+            })
+            .sync_create()
+            .build();
+    }
 }
 
 fn on_drop(

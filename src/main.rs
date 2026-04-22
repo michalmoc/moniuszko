@@ -20,7 +20,6 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
-// * artists shown in playlist
 // * library grouping modes
 // * library search
 // * volume control

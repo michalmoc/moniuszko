@@ -113,6 +113,7 @@ fn tree_bind(list_item: &Object, database: &DatabasePtr) {
         }
         ObjectId::AlbumId(album) => {
             let image = Image::new();
+            image.add_css_class("large-icons");
             dataobj
                 .bind_property("image", &image, "paintable")
                 .sync_create()

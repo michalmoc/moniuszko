@@ -9,7 +9,7 @@ mod imp {
     use gtk4::subclass::prelude::DerivedObjectProperties;
     use gtk4::subclass::prelude::{ObjectImpl, ObjectSubclass};
     use gtk4::{gdk, glib};
-    use std::cell::{Cell, Ref, RefCell};
+    use std::cell::{Cell, RefCell};
 
     #[derive(Default, Properties)]
     #[properties(wrapper_type = super::MediaListItem)]

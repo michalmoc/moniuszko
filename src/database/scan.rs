@@ -1,12 +1,13 @@
 use crate::database::traverse_files::FilesDatabase;
 use crate::database::{Album, AlbumId, Database, Track, TrackId};
-use lofty::file::TaggedFileExt;
+use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use ustr::Ustr;
 use uuid::Uuid;
 
@@ -20,6 +21,10 @@ pub struct FileData {
     pub album: Ustr,
     pub cd: u32,
     pub position: u32,
+
+    pub track_artists: Ustr,
+
+    pub duration: Duration,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -108,6 +113,8 @@ impl Scanner {
                     album,
                     position: data.position,
                     cd: data.cd,
+                    duration: data.duration,
+                    artists: data.track_artists,
                 },
             );
         }
@@ -117,6 +124,8 @@ impl Scanner {
 }
 fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
     let tagged_file = Probe::open(path)?.read()?;
+
+    let duration = tagged_file.properties().duration();
 
     let tag = match tagged_file.primary_tag() {
         Some(primary_tag) => primary_tag,
@@ -132,6 +141,8 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
                         album: Default::default(),
                         cd: Default::default(),
                         position: Default::default(),
+                        track_artists: Default::default(),
+                        duration,
                     });
                 } else {
                     anyhow::bail!("cannot tag file");
@@ -158,6 +169,8 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
     let position = tag.track().unwrap_or_default();
     let cd = tag.disk().unwrap_or_default();
 
+    let track_artists = tag.artist().map(|s| Ustr::from(&s)).unwrap_or_default();
+
     Ok(FileData {
         track_id: id.unwrap_or_else(|| TrackId::new()),
         title,
@@ -165,6 +178,8 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         album,
         cd,
         position,
+        track_artists,
+        duration,
     })
 }
 

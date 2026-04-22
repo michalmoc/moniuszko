@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::Index;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use ustr::Ustr;
 use uuid::Uuid;
 
@@ -60,6 +61,8 @@ pub struct Track {
     pub album: AlbumId,
     pub cd: u32,
     pub position: u32,
+    pub artists: Ustr,
+    pub duration: Duration,
 }
 
 pub struct Album {

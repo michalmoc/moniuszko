@@ -41,6 +41,12 @@ mod imp {
 
         #[property(get, set)]
         album: RefCell<String>,
+
+        #[property(get, set)]
+        artists: RefCell<String>,
+
+        #[property(get, set)]
+        duration: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -78,5 +84,9 @@ impl PlaylistItem {
                 .title
                 .to_string(),
         );
+        self.set_artists(database[self.stored_track()].artists.to_string());
+
+        let duration = database[self.stored_track()].duration.as_secs();
+        self.set_duration(format!("{:0>2}:{:0>2}", duration / 60, duration % 60));
     }
 }
