@@ -4,7 +4,7 @@ use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -25,6 +25,7 @@ pub struct FileData {
     pub track_artists: Ustr,
 
     pub duration: Duration,
+    pub year: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -79,6 +80,7 @@ impl Scanner {
     pub fn make_database(&self) -> Database {
         let mut tracks = HashMap::new();
         let mut albums = HashMap::new();
+        let mut years: BTreeMap<_, HashSet<_>> = BTreeMap::new();
 
         let mut known_albums = HashMap::new();
 
@@ -93,6 +95,7 @@ impl Scanner {
                     Album {
                         title: data.album,
                         tracks: BTreeMap::new(),
+                        year: data.year,
                     },
                 );
 
@@ -104,6 +107,8 @@ impl Scanner {
                 .unwrap()
                 .tracks
                 .insert((data.cd, data.position), data.track_id);
+
+            years.entry(data.year).or_default().insert(album);
 
             tracks.insert(
                 data.track_id,
@@ -119,7 +124,11 @@ impl Scanner {
             );
         }
 
-        Database { tracks, albums }
+        Database {
+            tracks,
+            albums,
+            years,
+        }
     }
 }
 fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
@@ -143,6 +152,7 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
                         position: Default::default(),
                         track_artists: Default::default(),
                         duration,
+                        year: None,
                     });
                 } else {
                     anyhow::bail!("cannot tag file");
@@ -171,6 +181,8 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
 
     let track_artists = tag.artist().map(|s| Ustr::from(&s)).unwrap_or_default();
 
+    let year = tag.date().map(|t| t.year);
+
     Ok(FileData {
         track_id: id.unwrap_or_else(|| TrackId::new()),
         title,
@@ -180,6 +192,7 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         position,
         track_artists,
         duration,
+        year,
     })
 }
 

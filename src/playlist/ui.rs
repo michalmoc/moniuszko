@@ -16,6 +16,7 @@ use gtk4::{
     Label, ListScrollFlags, MultiSelection, PickFlags, Shortcut, ShortcutController,
     SignalListItemFactory, Widget, gdk, gio,
 };
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::fs;
 
@@ -87,8 +88,8 @@ impl Ui {
         }
     }
 
-    pub fn refresh(&self, database: &DatabasePtr) {
-        let db = database.read().unwrap();
+    pub fn refresh(&self) {
+        let db = self.database.read().unwrap();
         for i in 0..self.store.n_items() {
             let item = self.store.item(i).and_downcast::<PlaylistItem>().unwrap();
             item.set_data(&db);
@@ -291,6 +292,7 @@ fn get_dropped_tracks(value: &Value, database: &DatabasePtr) -> Vec<TrackId> {
 }
 
 fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
+    // TODO: move resolving to drag
     match item {
         ObjectId::None => {
             vec![]
@@ -299,6 +301,16 @@ fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
             vec![track_id]
         }
         ObjectId::AlbumId(album_id) => database[album_id].tracks.values().copied().collect(),
+        ObjectId::Year(year) => {
+            let year = &database[year];
+            let mut albums = year.iter().map(|a| &database[*a]).collect_vec();
+            albums.sort_by_key(|a| &a.title);
+
+            albums
+                .iter()
+                .flat_map(|a| a.tracks.values().copied())
+                .collect()
+        }
     }
 }
 

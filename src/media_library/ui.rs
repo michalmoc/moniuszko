@@ -1,4 +1,5 @@
 use crate::database::{AlbumId, Database, DatabasePtr, ObjectId};
+use crate::media_library::grouping_mode::{Category, GroupingModePtr};
 use crate::media_library::ui_item::MediaListItem;
 use crate::playlist::ObjectIds;
 use gio::prelude::{ListModelExt, ObjectExt, StaticType};
@@ -19,10 +20,12 @@ pub struct Ui {
     top_store: gio::ListStore,
     tree_store: TreeListModel,
     widget: ListView,
+    database: DatabasePtr,
+    grouping_mode: GroupingModePtr,
 }
 
 impl Ui {
-    pub fn new(database: &DatabasePtr) -> Self {
+    pub fn new(database: DatabasePtr, grouping_mode: GroupingModePtr) -> Self {
         let factory = SignalListItemFactory::new();
         factory.connect_setup(tree_setup);
         let database_clone = database.clone();
@@ -30,8 +33,9 @@ impl Ui {
 
         let store = gio::ListStore::new::<MediaListItem>();
         let database_clone = database.clone();
+        let grouping_mode_clone = grouping_mode.clone();
         let model = TreeListModel::new(store.clone(), false, false, move |i| {
-            create(i, &database_clone)
+            create(i, &database_clone, &grouping_mode_clone)
         });
 
         let selection = MultiSelection::new(Some(model.clone()));
@@ -46,6 +50,8 @@ impl Ui {
             top_store: store,
             widget: tree,
             tree_store: model,
+            database,
+            grouping_mode,
         }
     }
 
@@ -65,21 +71,46 @@ impl Ui {
         self.widget.clone().upcast()
     }
 
-    pub fn repopulate(&self, database: &DatabasePtr) {
+    pub fn repopulate(&self) {
         self.top_store.remove_all();
 
-        let db = database.read().unwrap();
+        let db = self.database.read().unwrap();
+        let mode = self.grouping_mode.get();
 
-        let mut albums = db
-            .albums
-            .iter()
-            .map(|(id, album)| (*id, album.title))
-            .collect::<Vec<_>>();
-        albums.sort_by_key(|k| k.1);
+        match mode.top_category() {
+            Category::Track => {
+                let mut tracks = db
+                    .tracks
+                    .iter()
+                    .map(|(id, track)| (*id, track.title))
+                    .collect::<Vec<_>>();
+                tracks.sort_by_key(|k| k.1);
 
-        for (album_id, _) in albums {
-            self.top_store
-                .append(&MediaListItem::new_album(album_id, &db));
+                for (track_id, _) in tracks {
+                    self.top_store
+                        .append(&MediaListItem::new_track(track_id, &db));
+                }
+            }
+            Category::Album => {
+                let mut albums = db
+                    .albums
+                    .iter()
+                    .map(|(id, album)| (*id, album.title))
+                    .collect::<Vec<_>>();
+                albums.sort_by_key(|k| k.1);
+
+                for (album_id, _) in albums {
+                    self.top_store
+                        .append(&MediaListItem::new_album(album_id, &db));
+                }
+            }
+            // Category::Artist => {}
+            // Category::Genre => {}
+            Category::Year => {
+                for year in db.years.keys() {
+                    self.top_store.append(&MediaListItem::new_year(*year, &db));
+                }
+            }
         }
     }
 }
@@ -136,10 +167,18 @@ fn tree_bind(list_item: &Object, database: &DatabasePtr) {
             box_.append(&label);
             expander.set_child(Some(&box_));
         }
+        ObjectId::Year(_) => {
+            label.add_css_class("numeric");
+            expander.set_child(Some(&label));
+        }
     }
 }
 
-fn create(item: &Object, database: &DatabasePtr) -> Option<gio::ListModel> {
+fn create(
+    item: &Object,
+    database: &DatabasePtr,
+    grouping_mode: &GroupingModePtr,
+) -> Option<gio::ListModel> {
     let item = item.downcast_ref::<MediaListItem>().unwrap();
 
     match item.stored_object() {
@@ -151,6 +190,16 @@ fn create(item: &Object, database: &DatabasePtr) -> Option<gio::ListModel> {
             let db = database.read().unwrap();
             for (_, track) in &db[album_id].tracks {
                 store.append(&MediaListItem::new_track(*track, &db));
+            }
+
+            Some(store.upcast())
+        }
+        ObjectId::Year(year) => {
+            let store = gio::ListStore::new::<MediaListItem>();
+
+            let db = database.read().unwrap();
+            for album in &db[year] {
+                store.append(&MediaListItem::new_album(*album, &db));
             }
 
             Some(store.upcast())

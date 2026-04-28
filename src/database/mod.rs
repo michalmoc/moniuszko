@@ -3,7 +3,7 @@ mod traverse_files;
 
 use gtk4::glib;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Index;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -39,6 +39,7 @@ pub enum ObjectId {
     None,
     TrackId(TrackId),
     AlbumId(AlbumId),
+    Year(Option<u16>),
 }
 
 impl From<TrackId> for ObjectId {
@@ -50,6 +51,12 @@ impl From<TrackId> for ObjectId {
 impl From<AlbumId> for ObjectId {
     fn from(value: AlbumId) -> Self {
         Self::AlbumId(value)
+    }
+}
+
+impl From<Option<u16>> for ObjectId {
+    fn from(value: Option<u16>) -> Self {
+        Self::Year(value)
     }
 }
 
@@ -67,6 +74,7 @@ pub struct Track {
 
 pub struct Album {
     pub title: Ustr,
+    pub year: Option<u16>,
     pub tracks: BTreeMap<(u32, u32), TrackId>,
 }
 
@@ -74,6 +82,7 @@ pub struct Album {
 pub struct Database {
     pub tracks: HashMap<TrackId, Track>,
     pub albums: HashMap<AlbumId, Album>,
+    pub years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
     // authors: HashMap<Uuid, Author>,
     // genres: HashMap<String, Genre>,
 }
@@ -91,6 +100,14 @@ impl Index<AlbumId> for Database {
 
     fn index(&self, index: AlbumId) -> &Self::Output {
         self.albums.get(&index).unwrap()
+    }
+}
+
+impl Index<Option<u16>> for Database {
+    type Output = HashSet<AlbumId>;
+
+    fn index(&self, index: Option<u16>) -> &Self::Output {
+        self.years.get(&index).unwrap()
     }
 }
 

@@ -8,19 +8,25 @@ mod playlist;
 use crate::config::{Config, ConfigPtr};
 use crate::constants::{APP_ID, APP_NAME};
 use crate::database::{DatabasePtr, Scanner, ScannerPtr};
+use crate::media_library::{GroupingMode, GroupingModePtr};
 use adw::glib::Propagation;
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
 use gtk4::gdk::Display;
-use gtk4::{Button, CssProvider, Orientation, Paned};
+use gtk4::{
+    Button, CssProvider, DropDown, Expression, Orientation, Paned, StringList, StringObject,
+};
+use std::cell::Cell;
 use std::fs;
 use std::fs::File;
 use std::ops::Deref;
+use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
 // * library grouping modes
+// * multi-level grouping modes
 // * library search
 // * volume control
 // * app settings: media directory, full rescan
@@ -57,12 +63,21 @@ fn main() -> glib::ExitCode {
     let config_ptr = Arc::new(RwLock::new(config));
     let scanner_ptr = Arc::new(RwLock::new(scanner));
     let database_ptr = Arc::new(RwLock::new(database));
+    let grouping_mode_ptr = Rc::new(Cell::new(GroupingMode::Album));
 
     let application = adw::Application::builder().application_id(APP_ID).build();
 
     application.connect_startup(|_| load_css());
     let config_clone = config_ptr.clone();
-    application.connect_activate(move |a| build_ui(a, &database_ptr, &scanner_ptr, &config_clone));
+    application.connect_activate(move |a| {
+        build_ui(
+            a,
+            &database_ptr,
+            &scanner_ptr,
+            &config_clone,
+            &grouping_mode_ptr,
+        )
+    });
 
     application.run()
 }
@@ -84,6 +99,7 @@ fn build_ui(
     database: &DatabasePtr,
     scanner: &ScannerPtr,
     config: &ConfigPtr,
+    grouping_mode: &GroupingModePtr,
 ) {
     let window = ApplicationWindow::builder()
         .application(app)
@@ -111,8 +127,8 @@ fn build_ui(
     box_.append(&playlist_sw);
     box_.append(&player.widget());
 
-    let media_library = media_library::Ui::new(database);
-    media_library.repopulate(database);
+    let media_library = media_library::Ui::new(database.clone(), grouping_mode.clone());
+    media_library.repopulate();
     media_library.widget().set_vexpand(true);
     let playlist_clone = playlist.clone();
     media_library.connect_activate(move |obj| {
@@ -126,6 +142,23 @@ fn build_ui(
         .vexpand(true)
         .hexpand(false)
         .build();
+
+    let grouping_mode_list = StringList::new(GroupingMode::all_str());
+    let grouping_mode_choice = DropDown::new(Some(grouping_mode_list), None::<Expression>);
+    grouping_mode_choice.set_hexpand(true);
+    let media_library_clone = media_library.clone();
+    let grouping_mode_clone = grouping_mode.clone();
+    grouping_mode_choice.connect_selected_item_notify(move |d| {
+        on_grouping_mode_change(
+            d.selected_item()
+                .and_downcast::<StringObject>()
+                .unwrap()
+                .string()
+                .as_str(),
+            &grouping_mode_clone,
+            &media_library_clone,
+        )
+    });
 
     let refresh_button = Button::from_icon_name("view-refresh");
     let database_clone = database.clone();
@@ -144,9 +177,13 @@ fn build_ui(
         )
     });
 
+    let library_bottom_box = gtk4::Box::new(Orientation::Horizontal, 0);
+    library_bottom_box.append(&grouping_mode_choice);
+    library_bottom_box.append(&refresh_button);
+
     let media_library_box = gtk4::Box::new(Orientation::Vertical, 0);
     media_library_box.append(&media_library_sw);
-    media_library_box.append(&refresh_button);
+    media_library_box.append(&library_bottom_box);
 
     let paned = Paned::new(Orientation::Horizontal);
     paned.set_start_child(Some(&media_library_box));
@@ -178,7 +215,6 @@ fn refresh_button_cb(
     playlist: &playlist::Ui,
 ) {
     let database_clone = database.clone();
-    let database_clone2 = database.clone();
     let scanner_clone = scanner.clone();
     let button_clone = button.clone();
     let config_clone = config.clone();
@@ -205,9 +241,18 @@ fn refresh_button_cb(
         .await
         .expect("Task needs to finish successfully.");
 
-        media_library_clone.repopulate(&database_clone2);
-        playlist_clone.refresh(&database_clone2);
+        media_library_clone.repopulate();
+        playlist_clone.refresh();
 
         button_clone.set_sensitive(enable_button);
     });
+}
+
+fn on_grouping_mode_change(
+    selected: &str,
+    grouping_mode: &GroupingModePtr,
+    library: &media_library::Ui,
+) {
+    grouping_mode.set(GroupingMode::from_str(selected).unwrap());
+    library.repopulate();
 }

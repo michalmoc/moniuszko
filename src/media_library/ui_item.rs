@@ -53,4 +53,15 @@ impl MediaListItem {
             .property("name", database[album_id].title.to_string())
             .build()
     }
+
+    pub fn new_year(year: Option<u16>, database: &Database) -> Self {
+        Object::builder()
+            .property("stored_object", ObjectId::from(year))
+            .property(
+                "name",
+                year.map(|x| x.to_string())
+                    .unwrap_or("[unknown]".to_string()),
+            )
+            .build()
+    }
 }
