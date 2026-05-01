@@ -1,6 +1,7 @@
 use crate::database::{AlbumId, ArtistId, Database, ObjectId, TrackId};
 use gtk4::glib;
 use gtk4::glib::Object;
+use ustr::Ustr;
 
 mod imp {
     use crate::database::ObjectId;
@@ -58,6 +59,18 @@ impl MediaListItem {
         Object::builder()
             .property("stored_object", ObjectId::from(artist_id))
             .property("name", database[artist_id].name.to_string())
+            .build()
+    }
+
+    pub fn new_genre(genre: Option<Ustr>, database: &Database) -> Self {
+        Object::builder()
+            .property("stored_object", ObjectId::Genre(genre))
+            .property(
+                "name",
+                genre
+                    .map(|genre| genre.to_string())
+                    .unwrap_or("[unknown genre]".to_string()),
+            )
             .build()
     }
 

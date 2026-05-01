@@ -50,6 +50,7 @@ pub enum ObjectId {
     TrackId(TrackId),
     AlbumId(AlbumId),
     ArtistId(ArtistId),
+    Genre(Option<Ustr>),
     Year(Option<u16>),
 }
 
@@ -107,7 +108,7 @@ pub struct Database {
     pub albums: HashMap<AlbumId, Album>,
     pub years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
     pub artists: HashMap<ArtistId, Artist>,
-    // genres: HashMap<String, Genre>,
+    pub genres: BTreeMap<Option<Ustr>, HashSet<AlbumId>>,
 }
 
 impl Index<TrackId> for Database {

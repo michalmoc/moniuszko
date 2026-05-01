@@ -6,7 +6,7 @@ pub enum Category {
     Track,
     Album,
     Artist,
-    // TODO: Genre,
+    Genre,
     Year,
 }
 
@@ -15,17 +15,18 @@ pub enum GroupingMode {
     Album,
     ArtistAlbum,
     // ArtistYearAlbum,
-    // GenreAlbum,
+    GenreAlbum,
     // GenreYearAlbum,
+    // GenreArtistAlbum,
     YearAlbum,
 }
 
 impl GroupingMode {
-    pub fn all() -> [GroupingMode; 3] {
+    pub fn all() -> [GroupingMode; 4] {
         [
             GroupingMode::Album,
             GroupingMode::ArtistAlbum,
-            // GroupingMode::GenreAlbum,
+            GroupingMode::GenreAlbum,
             GroupingMode::YearAlbum,
             // GroupingMode::ArtistYearAlbum,
             // GroupingMode::GenreYearAlbum,
@@ -37,7 +38,7 @@ impl GroupingMode {
             GroupingMode::Album => "Album",
             GroupingMode::ArtistAlbum => "Artist / Album",
             // GroupingMode::ArtistYearAlbum => "Artist / Year / Album",
-            // GroupingMode::GenreAlbum => "Genre / Album",
+            GroupingMode::GenreAlbum => "Genre / Album",
             // GroupingMode::GenreYearAlbum => "Genre / Year / Album",
             GroupingMode::YearAlbum => "Year / Album",
         }
@@ -48,7 +49,7 @@ impl GroupingMode {
             "Album" => Some(GroupingMode::Album),
             "Artist / Album" => Some(GroupingMode::ArtistAlbum),
             // "Artist / Year / Album" => Some(GroupingMode::ArtistYearAlbum),
-            // "Genre / Album" => Some(GroupingMode::GenreAlbum),
+            "Genre / Album" => Some(GroupingMode::GenreAlbum),
             // "Genre / Year / Album" => Some(GroupingMode::GenreYearAlbum),
             "Year / Album" => Some(GroupingMode::YearAlbum),
             _ => None,
@@ -60,7 +61,7 @@ impl GroupingMode {
             "Album",
             "Artist / Album",
             // "Artist / Year / Album",
-            // "Genre / Album",
+            "Genre / Album",
             // "Genre / Year / Album",
             "Year / Album",
         ]
@@ -71,7 +72,7 @@ impl GroupingMode {
             GroupingMode::Album => Category::Album,
             GroupingMode::ArtistAlbum => Category::Artist,
             // GroupingMode::ArtistYearAlbum => Category::Artist,
-            // GroupingMode::GenreAlbum => Category::Genre,
+            GroupingMode::GenreAlbum => Category::Genre,
             // GroupingMode::GenreYearAlbum => Category::Genre,
             GroupingMode::YearAlbum => Category::Year,
         }
@@ -89,10 +90,10 @@ impl GroupingMode {
             //     Category::Year => Category::Album,
             //     _ => Category::Track,
             // },
-            // GroupingMode::GenreAlbum => match category {
-            //     Category::Genre => Category::Album,
-            //     _ => Category::Track,
-            // },
+            GroupingMode::GenreAlbum => match category {
+                Category::Genre => Category::Album,
+                _ => Category::Track,
+            },
             // GroupingMode::GenreYearAlbum => match category {
             //     Category::Genre => Category::Year,
             //     Category::Year => Category::Album,

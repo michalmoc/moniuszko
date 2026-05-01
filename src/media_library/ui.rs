@@ -117,7 +117,12 @@ impl Ui {
                         .append(&MediaListItem::new_artist(artist_id, &db));
                 }
             }
-            // Category::Genre => {}
+            Category::Genre => {
+                for genre in db.genres.keys() {
+                    self.top_store
+                        .append(&MediaListItem::new_genre(*genre, &db));
+                }
+            }
             Category::Year => {
                 for year in db.years.keys() {
                     self.top_store.append(&MediaListItem::new_year(*year, &db));
@@ -182,6 +187,9 @@ fn tree_bind(list_item: &Object, database: &DatabasePtr) {
         ObjectId::ArtistId(_) => {
             expander.set_child(Some(&label));
         }
+        ObjectId::Genre(_) => {
+            expander.set_child(Some(&label));
+        }
         ObjectId::Year(_) => {
             label.add_css_class("numeric");
             expander.set_child(Some(&label));
@@ -214,6 +222,17 @@ fn create(
 
             let db = database.read().unwrap();
             for album in &db[artist_id].albums {
+                store.append(&MediaListItem::new_album(*album, &db));
+            }
+            // TODO: sorting
+
+            Some(store.upcast())
+        }
+        ObjectId::Genre(genre) => {
+            let store = gio::ListStore::new::<MediaListItem>();
+
+            let db = database.read().unwrap();
+            for album in &db.genres[&genre] {
                 store.append(&MediaListItem::new_album(*album, &db));
             }
             // TODO: sorting

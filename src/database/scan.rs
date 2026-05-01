@@ -1,6 +1,7 @@
 use crate::database::musicbrainz::MusicBrainz;
 use crate::database::traverse_files::FilesDatabase;
 use crate::database::{Album, AlbumId, Artist, ArtistId, Database, Track, TrackId};
+use itertools::Itertools;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey};
@@ -29,6 +30,8 @@ pub struct FileData {
 
     pub duration: Duration,
     pub year: Option<u16>,
+
+    genres: Vec<Ustr>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -85,6 +88,7 @@ impl Scanner {
         let mut tracks = HashMap::new();
         let mut albums = HashMap::new();
         let mut artists = HashMap::new();
+        let mut genres = BTreeMap::<Option<Ustr>, HashSet<AlbumId>>::new();
         let mut years: BTreeMap<_, HashSet<_>> = BTreeMap::new();
 
         let mut known_albums = HashMap::new();
@@ -185,6 +189,14 @@ impl Scanner {
                 .tracks
                 .insert((data.cd, data.position), data.track_id);
 
+            if data.genres.is_empty() {
+                genres.entry(None).or_default().insert(album);
+            } else {
+                for genre in &data.genres {
+                    genres.entry(Some(*genre)).or_default().insert(album);
+                }
+            }
+
             years.entry(data.year).or_default().insert(album);
 
             for artist_id in &found_artists {
@@ -210,6 +222,7 @@ impl Scanner {
             albums,
             years,
             artists,
+            genres,
         }
     }
 }
@@ -237,6 +250,7 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
                         artists_uuids: Default::default(),
                         duration,
                         year: None,
+                        genres: Default::default(),
                     });
                 } else {
                     anyhow::bail!("cannot tag file");
@@ -276,6 +290,11 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
 
     let year = tag.date().map(|t| t.year);
 
+    let genres = tag
+        .get_strings(ItemKey::Genre)
+        .map(|s| Ustr::from(s))
+        .collect_vec();
+
     Ok(FileData {
         track_id: id.unwrap_or_else(|| TrackId::new()),
         title,
@@ -288,6 +307,7 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         artists_uuids,
         duration,
         year,
+        genres,
     })
 }
 

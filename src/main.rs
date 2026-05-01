@@ -25,7 +25,6 @@ use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
-// * library grouping modes
 // * more artists from musicbrainz?
 // * sort order
 // * multi-level grouping modes
