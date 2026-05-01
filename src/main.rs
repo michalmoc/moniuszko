@@ -26,6 +26,8 @@ use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
 // * library grouping modes
+// * more artists from musicbrainz?
+// * sort order
 // * multi-level grouping modes
 // * library search
 // * volume control
@@ -52,7 +54,7 @@ use std::sync::{Arc, RwLock};
 fn main() -> glib::ExitCode {
     let config = Config::load().unwrap();
 
-    let scanner: Scanner = if let Ok(scanner_file) = File::open(config.database_path()) {
+    let mut scanner: Scanner = if let Ok(scanner_file) = File::open(config.database_path()) {
         serde_json::from_reader(scanner_file).unwrap()
     } else {
         Default::default()

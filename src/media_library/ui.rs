@@ -104,7 +104,19 @@ impl Ui {
                         .append(&MediaListItem::new_album(album_id, &db));
                 }
             }
-            // Category::Artist => {}
+            Category::Artist => {
+                let mut artists = db
+                    .artists
+                    .iter()
+                    .map(|(id, album)| (*id, album.name))
+                    .collect::<Vec<_>>();
+                artists.sort_by_key(|k| k.1);
+
+                for (artist_id, _) in artists {
+                    self.top_store
+                        .append(&MediaListItem::new_artist(artist_id, &db));
+                }
+            }
             // Category::Genre => {}
             Category::Year => {
                 for year in db.years.keys() {
@@ -167,6 +179,9 @@ fn tree_bind(list_item: &Object, database: &DatabasePtr) {
             box_.append(&label);
             expander.set_child(Some(&box_));
         }
+        ObjectId::ArtistId(_) => {
+            expander.set_child(Some(&label));
+        }
         ObjectId::Year(_) => {
             label.add_css_class("numeric");
             expander.set_child(Some(&label));
@@ -194,6 +209,17 @@ fn create(
 
             Some(store.upcast())
         }
+        ObjectId::ArtistId(artist_id) => {
+            let store = gio::ListStore::new::<MediaListItem>();
+
+            let db = database.read().unwrap();
+            for album in &db[artist_id].albums {
+                store.append(&MediaListItem::new_album(*album, &db));
+            }
+            // TODO: sorting
+
+            Some(store.upcast())
+        }
         ObjectId::Year(year) => {
             let store = gio::ListStore::new::<MediaListItem>();
 
@@ -201,6 +227,7 @@ fn create(
             for album in &db[year] {
                 store.append(&MediaListItem::new_album(*album, &db));
             }
+            // TODO: sorting
 
             Some(store.upcast())
         }

@@ -301,6 +301,16 @@ fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
             vec![track_id]
         }
         ObjectId::AlbumId(album_id) => database[album_id].tracks.values().copied().collect(),
+        ObjectId::ArtistId(artist) => {
+            let artist = &database[artist];
+            let mut albums = artist.albums.iter().map(|a| &database[*a]).collect_vec();
+            albums.sort_by_key(|a| &a.title);
+
+            albums
+                .iter()
+                .flat_map(|a| a.tracks.values().copied())
+                .collect()
+        }
         ObjectId::Year(year) => {
             let year = &database[year];
             let mut albums = year.iter().map(|a| &database[*a]).collect_vec();

@@ -1,3 +1,4 @@
+mod musicbrainz;
 mod scan;
 mod traverse_files;
 
@@ -32,6 +33,15 @@ impl AlbumId {
     }
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub struct ArtistId(Uuid);
+
+impl ArtistId {
+    pub fn new() -> Self {
+        ArtistId(Uuid::now_v7())
+    }
+}
+
 #[derive(Default, Copy, Clone, Debug, glib::Boxed)]
 #[boxed_type(name = "ObjectId")]
 pub enum ObjectId {
@@ -39,6 +49,7 @@ pub enum ObjectId {
     None,
     TrackId(TrackId),
     AlbumId(AlbumId),
+    ArtistId(ArtistId),
     Year(Option<u16>),
 }
 
@@ -51,6 +62,12 @@ impl From<TrackId> for ObjectId {
 impl From<AlbumId> for ObjectId {
     fn from(value: AlbumId) -> Self {
         Self::AlbumId(value)
+    }
+}
+
+impl From<ArtistId> for ObjectId {
+    fn from(value: ArtistId) -> Self {
+        Self::ArtistId(value)
     }
 }
 
@@ -78,12 +95,18 @@ pub struct Album {
     pub tracks: BTreeMap<(u32, u32), TrackId>,
 }
 
+pub struct Artist {
+    pub uuid: Uuid,
+    pub name: Ustr,
+    pub albums: HashSet<AlbumId>,
+}
+
 #[derive(Default)]
 pub struct Database {
     pub tracks: HashMap<TrackId, Track>,
     pub albums: HashMap<AlbumId, Album>,
     pub years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
-    // authors: HashMap<Uuid, Author>,
+    pub artists: HashMap<ArtistId, Artist>,
     // genres: HashMap<String, Genre>,
 }
 
@@ -100,6 +123,14 @@ impl Index<AlbumId> for Database {
 
     fn index(&self, index: AlbumId) -> &Self::Output {
         self.albums.get(&index).unwrap()
+    }
+}
+
+impl Index<ArtistId> for Database {
+    type Output = Artist;
+
+    fn index(&self, index: ArtistId) -> &Self::Output {
+        self.artists.get(&index).unwrap()
     }
 }
 

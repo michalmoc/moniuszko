@@ -1,4 +1,4 @@
-use crate::database::{AlbumId, Database, ObjectId, TrackId};
+use crate::database::{AlbumId, ArtistId, Database, ObjectId, TrackId};
 use gtk4::glib;
 use gtk4::glib::Object;
 
@@ -51,6 +51,13 @@ impl MediaListItem {
         Object::builder()
             .property("stored_object", ObjectId::from(album_id))
             .property("name", database[album_id].title.to_string())
+            .build()
+    }
+
+    pub fn new_artist(artist_id: ArtistId, database: &Database) -> Self {
+        Object::builder()
+            .property("stored_object", ObjectId::from(artist_id))
+            .property("name", database[artist_id].name.to_string())
             .build()
     }
 

@@ -1,5 +1,6 @@
+use crate::database::musicbrainz::MusicBrainz;
 use crate::database::traverse_files::FilesDatabase;
-use crate::database::{Album, AlbumId, Database, Track, TrackId};
+use crate::database::{Album, AlbumId, Artist, ArtistId, Database, Track, TrackId};
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey};
@@ -22,7 +23,9 @@ pub struct FileData {
     pub cd: u32,
     pub position: u32,
 
+    pub album_artists: Ustr,
     pub track_artists: Ustr,
+    pub artists_uuids: HashSet<Uuid>,
 
     pub duration: Duration,
     pub year: Option<u16>,
@@ -31,6 +34,7 @@ pub struct FileData {
 #[derive(Serialize, Deserialize, Default)]
 pub struct Scanner {
     files_database: FilesDatabase,
+    music_brainz: MusicBrainz,
     files: HashMap<PathBuf, FileData>,
 }
 
@@ -77,14 +81,87 @@ impl Scanner {
         }
     }
 
-    pub fn make_database(&self) -> Database {
+    pub fn make_database(&mut self) -> Database {
         let mut tracks = HashMap::new();
         let mut albums = HashMap::new();
+        let mut artists = HashMap::new();
         let mut years: BTreeMap<_, HashSet<_>> = BTreeMap::new();
 
         let mut known_albums = HashMap::new();
+        let mut known_artist_uuids = HashMap::new();
+        let mut known_artist_names = HashMap::new();
 
         for (path, data) in &self.files {
+            let mut found_artists = {
+                let mut found_artists = HashSet::new();
+
+                for uuid in &data.artists_uuids {
+                    if let Some(artist_id) = known_artist_uuids.get(uuid) {
+                        found_artists.insert(*artist_id);
+                    } else if let Some(name) = self.music_brainz.get_artist_name(uuid) {
+                        let new_id = ArtistId::new();
+
+                        known_artist_uuids.insert(*uuid, new_id);
+                        artists.insert(
+                            new_id,
+                            Artist {
+                                uuid: *uuid,
+                                name,
+                                albums: Default::default(),
+                            },
+                        );
+
+                        found_artists.insert(new_id);
+                    };
+                }
+
+                found_artists
+            };
+
+            if found_artists.is_empty() {
+                // cannot get artists by uuid, so try to use simple tag
+                let name1 = data.album_artists;
+                let name2 = data.track_artists;
+
+                let artist_id1 = if let Some(artist_id) = known_artist_names.get(&name1) {
+                    *artist_id
+                } else {
+                    let new_id = ArtistId::new();
+
+                    known_artist_names.insert(name1, new_id);
+                    artists.insert(
+                        new_id,
+                        Artist {
+                            uuid: Uuid::nil(),
+                            name: name1,
+                            albums: Default::default(),
+                        },
+                    );
+
+                    new_id
+                };
+                found_artists.insert(artist_id1);
+
+                let artist_id2 = if let Some(artist_id) = known_artist_names.get(&name2) {
+                    *artist_id
+                } else {
+                    let new_id = ArtistId::new();
+
+                    known_artist_names.insert(name2, new_id);
+                    artists.insert(
+                        new_id,
+                        Artist {
+                            uuid: Uuid::nil(),
+                            name: name2,
+                            albums: Default::default(),
+                        },
+                    );
+
+                    new_id
+                };
+                found_artists.insert(artist_id2);
+            }
+
             let album = if let Some(album_id) = known_albums.get(&(data.album_uuid, data.album)) {
                 *album_id
             } else {
@@ -110,6 +187,10 @@ impl Scanner {
 
             years.entry(data.year).or_default().insert(album);
 
+            for artist_id in &found_artists {
+                artists.get_mut(artist_id).unwrap().albums.insert(album);
+            }
+
             tracks.insert(
                 data.track_id,
                 Track {
@@ -128,6 +209,7 @@ impl Scanner {
             tracks,
             albums,
             years,
+            artists,
         }
     }
 }
@@ -150,7 +232,9 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
                         album: Default::default(),
                         cd: Default::default(),
                         position: Default::default(),
+                        album_artists: Default::default(),
                         track_artists: Default::default(),
+                        artists_uuids: Default::default(),
                         duration,
                         year: None,
                     });
@@ -179,7 +263,16 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
     let position = tag.track().unwrap_or_default();
     let cd = tag.disk().unwrap_or_default();
 
+    let album_artists = tag
+        .get_string(ItemKey::AlbumArtist)
+        .map(|s| Ustr::from(&s))
+        .unwrap_or_default();
     let track_artists = tag.artist().map(|s| Ustr::from(&s)).unwrap_or_default();
+    let artists_uuids = tag
+        .get_strings(ItemKey::MusicBrainzArtistId)
+        .chain(tag.get_strings(ItemKey::MusicBrainzReleaseArtistId))
+        .filter_map(|s| Uuid::parse_str(&s).ok())
+        .collect();
 
     let year = tag.date().map(|t| t.year);
 
@@ -190,7 +283,9 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         album,
         cd,
         position,
+        album_artists,
         track_artists,
+        artists_uuids,
         duration,
         year,
     })

@@ -5,7 +5,7 @@ use std::rc::Rc;
 pub enum Category {
     Track,
     Album,
-    // TODO: Artist,
+    Artist,
     // TODO: Genre,
     Year,
 }
@@ -13,7 +13,7 @@ pub enum Category {
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum GroupingMode {
     Album,
-    // ArtistAlbum,
+    ArtistAlbum,
     // ArtistYearAlbum,
     // GenreAlbum,
     // GenreYearAlbum,
@@ -21,10 +21,10 @@ pub enum GroupingMode {
 }
 
 impl GroupingMode {
-    pub fn all() -> [GroupingMode; 2] {
+    pub fn all() -> [GroupingMode; 3] {
         [
             GroupingMode::Album,
-            // GroupingMode::ArtistAlbum,
+            GroupingMode::ArtistAlbum,
             // GroupingMode::GenreAlbum,
             GroupingMode::YearAlbum,
             // GroupingMode::ArtistYearAlbum,
@@ -35,7 +35,7 @@ impl GroupingMode {
     pub const fn to_str(&self) -> &'static str {
         match self {
             GroupingMode::Album => "Album",
-            // GroupingMode::ArtistAlbum => "Artist / Album",
+            GroupingMode::ArtistAlbum => "Artist / Album",
             // GroupingMode::ArtistYearAlbum => "Artist / Year / Album",
             // GroupingMode::GenreAlbum => "Genre / Album",
             // GroupingMode::GenreYearAlbum => "Genre / Year / Album",
@@ -46,7 +46,7 @@ impl GroupingMode {
     pub fn from_str(input: &str) -> Option<GroupingMode> {
         match input {
             "Album" => Some(GroupingMode::Album),
-            // "Artist / Album" => Some(GroupingMode::ArtistAlbum),
+            "Artist / Album" => Some(GroupingMode::ArtistAlbum),
             // "Artist / Year / Album" => Some(GroupingMode::ArtistYearAlbum),
             // "Genre / Album" => Some(GroupingMode::GenreAlbum),
             // "Genre / Year / Album" => Some(GroupingMode::GenreYearAlbum),
@@ -58,7 +58,7 @@ impl GroupingMode {
     pub fn all_str() -> &'static [&'static str] {
         &[
             "Album",
-            // "Artist / Album",
+            "Artist / Album",
             // "Artist / Year / Album",
             // "Genre / Album",
             // "Genre / Year / Album",
@@ -69,7 +69,7 @@ impl GroupingMode {
     pub fn top_category(&self) -> Category {
         match self {
             GroupingMode::Album => Category::Album,
-            // GroupingMode::ArtistAlbum => Category::Artist,
+            GroupingMode::ArtistAlbum => Category::Artist,
             // GroupingMode::ArtistYearAlbum => Category::Artist,
             // GroupingMode::GenreAlbum => Category::Genre,
             // GroupingMode::GenreYearAlbum => Category::Genre,
@@ -80,10 +80,10 @@ impl GroupingMode {
     pub fn next_category(&self, category: Category) -> Category {
         match self {
             GroupingMode::Album => Category::Track,
-            // GroupingMode::ArtistAlbum => match category {
-            //     Category::Artist => Category::Album,
-            //     _ => Category::Track,
-            // },
+            GroupingMode::ArtistAlbum => match category {
+                Category::Artist => Category::Album,
+                _ => Category::Track,
+            },
             // GroupingMode::ArtistYearAlbum => match category {
             //     Category::Artist => Category::Year,
             //     Category::Year => Category::Album,
