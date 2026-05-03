@@ -35,7 +35,7 @@ impl Ui {
             let tracks: Vec<TrackId> = serde_json::from_reader(file).unwrap();
             let db = database.read().unwrap();
             for track_id in tracks {
-                if db.tracks.contains_key(&track_id) {
+                if db.has_track(track_id) {
                     store.append(&PlaylistItem::new(track_id, &db));
                 }
             }
@@ -300,35 +300,26 @@ fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
         ObjectId::TrackId(track_id) => {
             vec![track_id]
         }
-        ObjectId::AlbumId(album_id) => database[album_id].tracks.values().copied().collect(),
+        ObjectId::AlbumId(album_id) => database[album_id].sorted_tracks().collect(),
         ObjectId::ArtistId(artist) => {
-            let artist = &database[artist];
-            let mut albums = artist.albums.iter().map(|a| &database[*a]).collect_vec();
-            albums.sort_by_key(|a| &a.title);
-
+            let albums = database.sorted_albums_of_artist(artist);
             albums
-                .iter()
-                .flat_map(|a| a.tracks.values().copied())
+                .into_iter()
+                .flat_map(|a| database[a].sorted_tracks())
                 .collect()
         }
         ObjectId::Genre(genre) => {
-            let albums = &database.genres[&genre];
-            let mut albums = albums.iter().map(|a| &database[*a]).collect_vec();
-            albums.sort_by_key(|a| &a.title);
-
+            let albums = database.sorted_albums_of_genre(genre);
             albums
-                .iter()
-                .flat_map(|a| a.tracks.values().copied())
+                .into_iter()
+                .flat_map(|a| database[a].sorted_tracks())
                 .collect()
         }
         ObjectId::Year(year) => {
-            let year = &database[year];
-            let mut albums = year.iter().map(|a| &database[*a]).collect_vec();
-            albums.sort_by_key(|a| &a.title);
-
+            let albums = database.sorted_albums_of_year(year);
             albums
-                .iter()
-                .flat_map(|a| a.tracks.values().copied())
+                .into_iter()
+                .flat_map(|a| database[a].sorted_tracks())
                 .collect()
         }
     }

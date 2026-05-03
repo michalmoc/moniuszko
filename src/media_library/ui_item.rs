@@ -58,11 +58,17 @@ impl MediaListItem {
     pub fn new_artist(artist_id: ArtistId, database: &Database) -> Self {
         Object::builder()
             .property("stored_object", ObjectId::from(artist_id))
-            .property("name", database[artist_id].name.to_string())
+            .property(
+                "name",
+                database[artist_id]
+                    .name
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "[unknown artist]".to_string()),
+            )
             .build()
     }
 
-    pub fn new_genre(genre: Option<Ustr>, database: &Database) -> Self {
+    pub fn new_genre(genre: Option<Ustr>) -> Self {
         Object::builder()
             .property("stored_object", ObjectId::Genre(genre))
             .property(
@@ -74,13 +80,13 @@ impl MediaListItem {
             .build()
     }
 
-    pub fn new_year(year: Option<u16>, database: &Database) -> Self {
+    pub fn new_year(year: Option<u16>) -> Self {
         Object::builder()
             .property("stored_object", ObjectId::from(year))
             .property(
                 "name",
                 year.map(|x| x.to_string())
-                    .unwrap_or("[unknown]".to_string()),
+                    .unwrap_or("[unknown year]".to_string()),
             )
             .build()
     }

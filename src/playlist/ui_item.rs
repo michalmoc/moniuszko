@@ -84,7 +84,12 @@ impl PlaylistItem {
                 .title
                 .to_string(),
         );
-        self.set_artists(database[self.stored_track()].artists.to_string());
+        self.set_artists(
+            database[self.stored_track()]
+                .artists
+                .map(|s| s.to_string())
+                .unwrap_or_default(),
+        );
 
         let duration = database[self.stored_track()].duration.as_secs();
         self.set_duration(format!("{:0>2}:{:0>2}", duration / 60, duration % 60));

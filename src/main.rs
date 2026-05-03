@@ -26,11 +26,14 @@ use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
 // * more artists from musicbrainz?
-// * sort order
+// * tracks without artist or album
+// * remove file hashing from scanner
 // * multi-level grouping modes
 // * library search
 // * volume control
 // * app settings: media directory, full rescan
+// * show cd if max cd > 1 in # column
+// * save library grouping mode
 
 // TODO: for 1.1
 // * translations
@@ -146,6 +149,7 @@ fn build_ui(
 
     let grouping_mode_list = StringList::new(GroupingMode::all_str());
     let grouping_mode_choice = DropDown::new(Some(grouping_mode_list), None::<Expression>);
+    grouping_mode_choice.set_selected(1);
     grouping_mode_choice.set_hexpand(true);
     let media_library_clone = media_library.clone();
     let grouping_mode_clone = grouping_mode.clone();

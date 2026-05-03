@@ -3,6 +3,7 @@ mod scan;
 mod traverse_files;
 
 use gtk4::glib;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Index;
@@ -83,32 +84,105 @@ pub struct Track {
     pub path: PathBuf,
 
     pub title: Ustr,
+    pub title_sort: Ustr,
+
     pub album: AlbumId,
     pub cd: u32,
     pub position: u32,
-    pub artists: Ustr,
+
+    pub artists: Option<Ustr>,
+
     pub duration: Duration,
 }
 
 pub struct Album {
     pub title: Ustr,
+    pub title_sort: Ustr,
+
     pub year: Option<u16>,
-    pub tracks: BTreeMap<(u32, u32), TrackId>,
+    tracks: BTreeMap<(u32, u32), TrackId>,
+}
+
+impl Album {
+    pub fn sorted_tracks(&self) -> impl Iterator<Item = TrackId> {
+        self.tracks.values().copied()
+    }
 }
 
 pub struct Artist {
     pub uuid: Uuid,
-    pub name: Ustr,
-    pub albums: HashSet<AlbumId>,
+    pub name: Option<Ustr>,
+    pub sort: Option<Ustr>,
+    albums: HashSet<AlbumId>,
 }
 
 #[derive(Default)]
 pub struct Database {
-    pub tracks: HashMap<TrackId, Track>,
-    pub albums: HashMap<AlbumId, Album>,
-    pub years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
-    pub artists: HashMap<ArtistId, Artist>,
-    pub genres: BTreeMap<Option<Ustr>, HashSet<AlbumId>>,
+    tracks: HashMap<TrackId, Track>,
+    albums: HashMap<AlbumId, Album>,
+    years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
+    artists: HashMap<ArtistId, Artist>,
+    genres: BTreeMap<Option<Ustr>, HashSet<AlbumId>>,
+}
+
+impl Database {
+    pub fn has_track(&self, track_id: TrackId) -> bool {
+        self.tracks.contains_key(&track_id)
+    }
+
+    pub fn sorted_tracks(&self) -> Vec<TrackId> {
+        let mut tracks = self.tracks.iter().collect_vec();
+        tracks.sort_by_key(|(_, t)| t.title_sort);
+        tracks.into_iter().map(|(id, _)| *id).collect()
+    }
+
+    pub fn sorted_albums(&self) -> Vec<AlbumId> {
+        let mut albums = self.albums.iter().collect_vec();
+        albums.sort_by_key(|(_, t)| t.title_sort);
+        albums.into_iter().map(|(id, _)| *id).collect()
+    }
+
+    pub fn sorted_albums_of_artist(&self, artist_id: ArtistId) -> Vec<AlbumId> {
+        let mut albums = self[artist_id]
+            .albums
+            .iter()
+            .map(|a| (*a, self[*a].title_sort))
+            .collect_vec();
+        albums.sort_by_key(|a| a.1);
+        albums.into_iter().map(|a| a.0).collect_vec()
+    }
+
+    pub fn sorted_albums_of_year(&self, year: Option<u16>) -> Vec<AlbumId> {
+        let mut albums = self.years[&year]
+            .iter()
+            .map(|a| (*a, self[*a].title_sort))
+            .collect_vec();
+        albums.sort_by_key(|a| a.1);
+        albums.into_iter().map(|a| a.0).collect_vec()
+    }
+
+    pub fn sorted_albums_of_genre(&self, genre: Option<Ustr>) -> Vec<AlbumId> {
+        let mut albums = self.genres[&genre]
+            .iter()
+            .map(|a| (*a, self[*a].title_sort))
+            .collect_vec();
+        albums.sort_by_key(|a| a.1);
+        albums.into_iter().map(|a| a.0).collect_vec()
+    }
+
+    pub fn sorted_artists(&self) -> Vec<ArtistId> {
+        let mut artists = self.artists.iter().collect_vec();
+        artists.sort_by_key(|(_, a)| a.sort);
+        artists.into_iter().map(|(id, _)| *id).collect()
+    }
+
+    pub fn sorted_years(&self) -> impl Iterator<Item = Option<u16>> {
+        self.years.keys().copied()
+    }
+
+    pub fn sorted_genres(&self) -> impl Iterator<Item = Option<Ustr>> {
+        self.genres.keys().copied()
+    }
 }
 
 impl Index<TrackId> for Database {
@@ -132,14 +206,6 @@ impl Index<ArtistId> for Database {
 
     fn index(&self, index: ArtistId) -> &Self::Output {
         self.artists.get(&index).unwrap()
-    }
-}
-
-impl Index<Option<u16>> for Database {
-    type Output = HashSet<AlbumId>;
-
-    fn index(&self, index: Option<u16>) -> &Self::Output {
-        self.years.get(&index).unwrap()
     }
 }
 

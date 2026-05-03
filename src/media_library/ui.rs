@@ -79,53 +79,31 @@ impl Ui {
 
         match mode.top_category() {
             Category::Track => {
-                let mut tracks = db
-                    .tracks
-                    .iter()
-                    .map(|(id, track)| (*id, track.title))
-                    .collect::<Vec<_>>();
-                tracks.sort_by_key(|k| k.1);
-
-                for (track_id, _) in tracks {
+                for track_id in db.sorted_tracks() {
                     self.top_store
                         .append(&MediaListItem::new_track(track_id, &db));
                 }
             }
             Category::Album => {
-                let mut albums = db
-                    .albums
-                    .iter()
-                    .map(|(id, album)| (*id, album.title))
-                    .collect::<Vec<_>>();
-                albums.sort_by_key(|k| k.1);
-
-                for (album_id, _) in albums {
+                for album_id in db.sorted_albums() {
                     self.top_store
                         .append(&MediaListItem::new_album(album_id, &db));
                 }
             }
             Category::Artist => {
-                let mut artists = db
-                    .artists
-                    .iter()
-                    .map(|(id, album)| (*id, album.name))
-                    .collect::<Vec<_>>();
-                artists.sort_by_key(|k| k.1);
-
-                for (artist_id, _) in artists {
+                for artist_id in db.sorted_artists() {
                     self.top_store
                         .append(&MediaListItem::new_artist(artist_id, &db));
                 }
             }
             Category::Genre => {
-                for genre in db.genres.keys() {
-                    self.top_store
-                        .append(&MediaListItem::new_genre(*genre, &db));
+                for genre in db.sorted_genres() {
+                    self.top_store.append(&MediaListItem::new_genre(genre));
                 }
             }
             Category::Year => {
-                for year in db.years.keys() {
-                    self.top_store.append(&MediaListItem::new_year(*year, &db));
+                for year in db.sorted_years() {
+                    self.top_store.append(&MediaListItem::new_year(year));
                 }
             }
         }
@@ -211,8 +189,8 @@ fn create(
             let store = gio::ListStore::new::<MediaListItem>();
 
             let db = database.read().unwrap();
-            for (_, track) in &db[album_id].tracks {
-                store.append(&MediaListItem::new_track(*track, &db));
+            for track in db[album_id].sorted_tracks() {
+                store.append(&MediaListItem::new_track(track, &db));
             }
 
             Some(store.upcast())
@@ -221,10 +199,9 @@ fn create(
             let store = gio::ListStore::new::<MediaListItem>();
 
             let db = database.read().unwrap();
-            for album in &db[artist_id].albums {
-                store.append(&MediaListItem::new_album(*album, &db));
+            for album in db.sorted_albums_of_artist(artist_id) {
+                store.append(&MediaListItem::new_album(album, &db));
             }
-            // TODO: sorting
 
             Some(store.upcast())
         }
@@ -232,10 +209,9 @@ fn create(
             let store = gio::ListStore::new::<MediaListItem>();
 
             let db = database.read().unwrap();
-            for album in &db.genres[&genre] {
-                store.append(&MediaListItem::new_album(*album, &db));
+            for album in db.sorted_albums_of_genre(genre) {
+                store.append(&MediaListItem::new_album(album, &db));
             }
-            // TODO: sorting
 
             Some(store.upcast())
         }
@@ -243,10 +219,9 @@ fn create(
             let store = gio::ListStore::new::<MediaListItem>();
 
             let db = database.read().unwrap();
-            for album in &db[year] {
-                store.append(&MediaListItem::new_album(*album, &db));
+            for album in db.sorted_albums_of_year(year) {
+                store.append(&MediaListItem::new_album(album, &db));
             }
-            // TODO: sorting
 
             Some(store.upcast())
         }
@@ -294,8 +269,8 @@ fn drag_prepare(drag_source: &DragSource, x: f64, y: f64) -> Option<gdk::Content
 }
 
 fn load_image(album: AlbumId, db: &Database) -> Option<gdk::Texture> {
-    let any_track = db[album].tracks.values().next()?;
-    let path = &db[*any_track].path;
+    let any_track = db[album].sorted_tracks().next()?;
+    let path = &db[any_track].path;
 
     let tagged_file = Probe::open(path).ok()?.read().ok()?;
 
