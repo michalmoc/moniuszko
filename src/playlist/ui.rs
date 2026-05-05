@@ -300,26 +300,26 @@ fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
         ObjectId::TrackId(track_id) => {
             vec![track_id]
         }
-        ObjectId::AlbumId(album_id) => database[album_id].sorted_tracks().collect(),
+        ObjectId::AlbumId(album_id) => database.sorted_tracks_of_album(album_id),
         ObjectId::ArtistId(artist) => {
             let albums = database.sorted_albums_of_artist(artist);
             albums
                 .into_iter()
-                .flat_map(|a| database[a].sorted_tracks())
+                .flat_map(|a| database.sorted_tracks_of_album(a))
                 .collect()
         }
         ObjectId::Genre(genre) => {
             let albums = database.sorted_albums_of_genre(genre);
             albums
                 .into_iter()
-                .flat_map(|a| database[a].sorted_tracks())
+                .flat_map(|a| database.sorted_tracks_of_album(a))
                 .collect()
         }
         ObjectId::Year(year) => {
             let albums = database.sorted_albums_of_year(year);
             albums
                 .into_iter()
-                .flat_map(|a| database[a].sorted_tracks())
+                .flat_map(|a| database.sorted_tracks_of_album(a))
                 .collect()
         }
     }

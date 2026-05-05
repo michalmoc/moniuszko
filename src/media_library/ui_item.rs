@@ -49,9 +49,16 @@ impl MediaListItem {
     }
 
     pub fn new_album(album_id: AlbumId, database: &Database) -> Self {
+        let s = database[album_id].title.to_string();
+        let name = if !s.is_empty() {
+            s
+        } else {
+            String::from("[no album]")
+        };
+
         Object::builder()
             .property("stored_object", ObjectId::from(album_id))
-            .property("name", database[album_id].title.to_string())
+            .property("name", name)
             .build()
     }
 
@@ -75,7 +82,7 @@ impl MediaListItem {
                 "name",
                 genre
                     .map(|genre| genre.to_string())
-                    .unwrap_or("[unknown genre]".to_string()),
+                    .unwrap_or("[no genre]".to_string()),
             )
             .build()
     }

@@ -189,7 +189,7 @@ fn create(
             let store = gio::ListStore::new::<MediaListItem>();
 
             let db = database.read().unwrap();
-            for track in db[album_id].sorted_tracks() {
+            for track in db.sorted_tracks_of_album(album_id) {
                 store.append(&MediaListItem::new_track(track, &db));
             }
 
@@ -269,7 +269,7 @@ fn drag_prepare(drag_source: &DragSource, x: f64, y: f64) -> Option<gdk::Content
 }
 
 fn load_image(album: AlbumId, db: &Database) -> Option<gdk::Texture> {
-    let any_track = db[album].sorted_tracks().next()?;
+    let any_track = db.sorted_tracks_of_album(album).into_iter().next()?;
     let path = &db[any_track].path;
 
     let tagged_file = Probe::open(path).ok()?.read().ok()?;

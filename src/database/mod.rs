@@ -87,8 +87,8 @@ pub struct Track {
     pub title_sort: Ustr,
 
     pub album: AlbumId,
-    pub cd: u32,
-    pub position: u32,
+    pub cd: Option<u32>,
+    pub position: Option<u32>,
 
     pub artists: Option<Ustr>,
 
@@ -99,14 +99,9 @@ pub struct Album {
     pub title: Ustr,
     pub title_sort: Ustr,
 
-    pub year: Option<u16>,
+    pub year: Option<u16>, // TODO: allow multiple
+    unordered_tracks: Vec<TrackId>,
     tracks: BTreeMap<(u32, u32), TrackId>,
-}
-
-impl Album {
-    pub fn sorted_tracks(&self) -> impl Iterator<Item = TrackId> {
-        self.tracks.values().copied()
-    }
 }
 
 pub struct Artist {
@@ -134,6 +129,14 @@ impl Database {
         let mut tracks = self.tracks.iter().collect_vec();
         tracks.sort_by_key(|(_, t)| t.title_sort);
         tracks.into_iter().map(|(id, _)| *id).collect()
+    }
+
+    pub fn sorted_tracks_of_album(&self, album_id: AlbumId) -> Vec<TrackId> {
+        let mut tracks = self[album_id].unordered_tracks.clone();
+        tracks.sort_by_key(|t| self[*t].title_sort);
+        tracks.extend(self[album_id].tracks.values());
+
+        tracks
     }
 
     pub fn sorted_albums(&self) -> Vec<AlbumId> {

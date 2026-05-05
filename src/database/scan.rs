@@ -23,8 +23,8 @@ pub struct FileData {
     pub album_uuid: Option<Uuid>,
     pub album: Option<Ustr>,
     pub album_sort: Option<Ustr>,
-    pub cd: u32,
-    pub position: u32,
+    pub cd: Option<u32>,
+    pub position: Option<u32>,
 
     pub album_artists: Option<Ustr>,
     pub album_artists_sort: Option<Ustr>,
@@ -100,39 +100,35 @@ impl Scanner {
         let mut known_artist_names = HashMap::new();
 
         for (path, data) in &self.files {
-            let mut found_artists = {
-                let mut found_artists = HashSet::new();
+            let mut found_artists = HashSet::new();
 
-                for uuid in &data.artists_uuids {
-                    if let Some(artist_id) = known_artist_uuids.get(uuid) {
-                        found_artists.insert(*artist_id);
-                    } else if let Some(name) = self.music_brainz.get_artist_name(uuid) {
-                        let new_id = ArtistId::new();
+            for uuid in &data.artists_uuids {
+                if let Some(artist_id) = known_artist_uuids.get(uuid) {
+                    found_artists.insert(*artist_id);
+                } else if let Some(name) = self.music_brainz.get_artist_name(uuid) {
+                    let new_id = ArtistId::new();
 
-                        known_artist_uuids.insert(*uuid, new_id);
-                        artists.insert(
-                            new_id,
-                            Artist {
-                                uuid: *uuid,
-                                name: Some(name.name),
-                                sort: Some(name.sort),
-                                albums: Default::default(),
-                            },
-                        );
+                    known_artist_uuids.insert(*uuid, new_id);
+                    artists.insert(
+                        new_id,
+                        Artist {
+                            uuid: *uuid,
+                            name: Some(name.name),
+                            sort: Some(name.sort),
+                            albums: Default::default(),
+                        },
+                    );
 
-                        found_artists.insert(new_id);
-                    };
-                }
-
-                found_artists
-            };
+                    found_artists.insert(new_id);
+                };
+            }
 
             if found_artists.is_empty() {
                 // cannot get artists by uuid, so try to use simple tag
                 let name1 = data.album_artists;
-                let sort1 = data.album_artists_sort;
+                let sort1 = data.album_artists_sort.or(name1);
                 let name2 = data.track_artists;
-                let sort2 = data.track_artists_sort;
+                let sort2 = data.track_artists_sort.or(name2);
 
                 let artist_id1 = if let Some(artist_id) = known_artist_names.get(&(name1, sort1)) {
                     *artist_id
@@ -180,24 +176,53 @@ impl Scanner {
             } else {
                 let album_id = AlbumId::new();
                 known_albums.insert((data.album_uuid, data.album), album_id);
-                albums.insert(
-                    album_id,
+
+                let new_album = if let Some(title) = data.album {
                     Album {
-                        title: data.album.unwrap_or_default(),
-                        title_sort: data.album_sort.unwrap_or_default(),
+                        title,
+                        title_sort: data.album_sort.unwrap_or(title),
                         tracks: BTreeMap::new(),
+                        unordered_tracks: Vec::new(),
                         year: data.year,
-                    },
-                );
+                    }
+                } else if let Some(uuid) = data.album_uuid {
+                    let uuid = Ustr::from(uuid.to_string().as_str());
+                    Album {
+                        title: uuid,
+                        title_sort: data.album_sort.unwrap_or(uuid),
+                        tracks: BTreeMap::new(),
+                        unordered_tracks: Vec::new(),
+                        year: data.year,
+                    }
+                } else {
+                    Album {
+                        title: Ustr::default(),
+                        title_sort: Ustr::default(),
+                        tracks: BTreeMap::new(),
+                        unordered_tracks: Vec::new(),
+                        year: None,
+                    }
+                };
+
+                albums.insert(album_id, new_album);
 
                 album_id
             };
 
-            albums
-                .get_mut(&album)
-                .unwrap()
-                .tracks
-                .insert((data.cd, data.position), data.track_id);
+            if let Some(position) = data.position {
+                let cd = data.cd.unwrap_or_default();
+                albums
+                    .get_mut(&album)
+                    .unwrap()
+                    .tracks
+                    .insert((cd, position), data.track_id);
+            } else {
+                albums
+                    .get_mut(&album)
+                    .unwrap()
+                    .unordered_tracks
+                    .push(data.track_id);
+            }
 
             if data.genres.is_empty() {
                 genres.entry(None).or_default().insert(album);
@@ -237,6 +262,7 @@ impl Scanner {
         }
     }
 }
+
 fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
     let tagged_file = Probe::open(path)?.read()?;
 
@@ -296,8 +322,8 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         .map(|s| Ustr::from(&s))
         .or(album);
 
-    let position = tag.track().unwrap_or_default();
-    let cd = tag.disk().unwrap_or_default();
+    let position = tag.track();
+    let cd = tag.disk();
 
     let album_artists = tag.get_string(ItemKey::AlbumArtist).map(|s| Ustr::from(&s));
     let album_artists_sort = tag

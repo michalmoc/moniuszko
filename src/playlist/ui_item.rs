@@ -33,8 +33,8 @@ mod imp {
         #[property(get, set)]
         path: RefCell<PathBuf>,
 
-        #[property(get, set)]
-        position: Cell<u32>,
+        #[property(get, set, nullable)]
+        position: RefCell<Option<String>>,
 
         #[property(get, set)]
         name: RefCell<String>,
@@ -77,7 +77,11 @@ impl PlaylistItem {
 
     pub fn set_data(&self, database: &Database) {
         self.set_path(database[self.stored_track()].path.clone());
-        self.set_position(database[self.stored_track()].position);
+        self.set_position(
+            database[self.stored_track()]
+                .position
+                .map(|n| n.to_string()),
+        );
         self.set_name(database[self.stored_track()].title.to_string());
         self.set_album(
             database[database[self.stored_track()].album]
