@@ -49,9 +49,8 @@ impl Scanner {
     pub fn scan(&mut self, path: &Path) {
         let files = self.files_database.scan(path);
         println!(
-            "unchanged: {}, moved: {}, modified: {}, deleted: {}, new: {}",
+            "unchanged: {}, modified: {}, deleted: {}, new: {}",
             files.unchanged.len(),
-            files.moved.len(),
             files.modified.len(),
             files.deleted.len(),
             files.new.len()
@@ -59,12 +58,6 @@ impl Scanner {
 
         for file in files.deleted {
             self.files.remove(&file);
-        }
-
-        for (old, new) in files.moved {
-            if let Some(track) = self.files.remove(&old) {
-                self.files.insert(new, track);
-            }
         }
 
         for file in files.new {

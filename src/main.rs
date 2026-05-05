@@ -26,7 +26,6 @@ use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
 // * more artists from musicbrainz?
-// * remove file hashing from scanner
 // * multi-level grouping modes
 // * library search
 // * volume control
