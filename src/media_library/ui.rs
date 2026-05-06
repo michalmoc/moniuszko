@@ -212,8 +212,20 @@ fn create(
 
             let db = database.read().unwrap();
             for album in db.sorted_albums_of_artist(artist_id) {
+                if db.album_matches_filter(album, &filters) {
+                    store.append(&MediaListItem::new_album(album, filters.clone(), &db));
+                }
+            }
+
+            Some(store.upcast())
+        }
+        (ObjectId::ArtistId(artist_id), Category::Year) => {
+            let store = gio::ListStore::new::<MediaListItem>();
+
+            let db = database.read().unwrap();
+            for year in db.sorted_years_of_artist(artist_id) {
                 // TODO: filter
-                store.append(&MediaListItem::new_album(album, filters.clone(), &db));
+                store.append(&MediaListItem::new_year(year, filters.clone()));
             }
 
             Some(store.upcast())
@@ -223,8 +235,9 @@ fn create(
 
             let db = database.read().unwrap();
             for album in db.sorted_albums_of_genre(genre) {
-                // TODO: filter
-                store.append(&MediaListItem::new_album(album, filters.clone(), &db));
+                if db.album_matches_filter(album, &filters) {
+                    store.append(&MediaListItem::new_album(album, filters.clone(), &db));
+                }
             }
 
             Some(store.upcast())
@@ -234,8 +247,9 @@ fn create(
 
             let db = database.read().unwrap();
             for album in db.sorted_albums_of_year(year) {
-                // TODO: filter
-                store.append(&MediaListItem::new_album(album, filters.clone(), &db));
+                if db.album_matches_filter(album, &filters) {
+                    store.append(&MediaListItem::new_album(album, filters.clone(), &db));
+                }
             }
 
             Some(store.upcast())

@@ -186,6 +186,19 @@ impl Database {
         self.years.keys().copied()
     }
 
+    pub fn sorted_years_of_artist(&self, artist_id: ArtistId) -> Vec<Option<u16>> {
+        let mut years = self[artist_id]
+            .albums
+            .iter()
+            .map(|a| self[*a].year)
+            .collect_vec();
+
+        years.sort_unstable();
+        years.dedup();
+
+        years
+    }
+
     pub fn sorted_genres(&self) -> impl Iterator<Item = Option<Ustr>> {
         self.genres.keys().copied()
     }
@@ -224,6 +237,43 @@ impl Database {
                 }
                 ObjectId::Year(year) => {
                     if track.year != *year {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    pub fn album_matches_filter(&self, album_id: AlbumId, filter: &Vec<ObjectId>) -> bool {
+        let album = &self[album_id];
+
+        for object in filter {
+            match object {
+                ObjectId::None => {}
+                ObjectId::TrackId(t) => {
+                    if self[*t].album != album_id {
+                        return false;
+                    }
+                }
+                ObjectId::AlbumId(a) => {
+                    if *a != album_id {
+                        return false;
+                    }
+                }
+                ObjectId::ArtistId(artist_id) => {
+                    if !self[*artist_id].albums.contains(&album_id) {
+                        return false;
+                    }
+                }
+                ObjectId::Genre(genre) => {
+                    if !self.genres[genre].contains(&album_id) {
+                        return false;
+                    }
+                }
+                ObjectId::Year(year) => {
+                    if !self.years[year].contains(&album_id) {
                         return false;
                     }
                 }
