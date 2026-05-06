@@ -115,12 +115,18 @@ pub struct Artist {
 }
 
 #[derive(Default)]
+pub struct Genre {
+    albums: HashSet<AlbumId>,
+    artists: HashSet<ArtistId>,
+}
+
+#[derive(Default)]
 pub struct Database {
     tracks: HashMap<TrackId, Track>,
     albums: HashMap<AlbumId, Album>,
     years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
     artists: HashMap<ArtistId, Artist>,
-    genres: BTreeMap<Option<Ustr>, HashSet<AlbumId>>,
+    genres: BTreeMap<Option<Ustr>, Genre>,
 }
 
 impl Database {
@@ -169,6 +175,7 @@ impl Database {
 
     pub fn sorted_albums_of_genre(&self, genre: Option<Ustr>) -> Vec<AlbumId> {
         let mut albums = self.genres[&genre]
+            .albums
             .iter()
             .map(|a| (*a, self[*a].title_sort))
             .collect_vec();
@@ -182,12 +189,35 @@ impl Database {
         artists.into_iter().map(|(id, _)| *id).collect()
     }
 
+    pub fn sorted_artists_of_genre(&self, genre: Option<Ustr>) -> Vec<ArtistId> {
+        let mut artists = self.genres[&genre]
+            .artists
+            .iter()
+            .map(|a| (*a, self[*a].sort))
+            .collect_vec();
+        artists.sort_by_key(|a| a.1);
+        artists.into_iter().map(|a| a.0).collect_vec()
+    }
+
     pub fn sorted_years(&self) -> impl Iterator<Item = Option<u16>> {
         self.years.keys().copied()
     }
 
     pub fn sorted_years_of_artist(&self, artist_id: ArtistId) -> Vec<Option<u16>> {
         let mut years = self[artist_id]
+            .albums
+            .iter()
+            .map(|a| self[*a].year)
+            .collect_vec();
+
+        years.sort_unstable();
+        years.dedup();
+
+        years
+    }
+
+    pub fn sorted_years_of_genre(&self, genre: Option<Ustr>) -> Vec<Option<u16>> {
+        let mut years = self.genres[&genre]
             .albums
             .iter()
             .map(|a| self[*a].year)
@@ -268,7 +298,7 @@ impl Database {
                     }
                 }
                 ObjectId::Genre(genre) => {
-                    if !self.genres[genre].contains(&album_id) {
+                    if !self.genres[genre].albums.contains(&album_id) {
                         return false;
                     }
                 }

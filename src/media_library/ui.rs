@@ -242,6 +242,28 @@ fn create(
 
             Some(store.upcast())
         }
+        (ObjectId::Genre(genre), Category::Year) => {
+            let store = gio::ListStore::new::<MediaListItem>();
+
+            let db = database.read().unwrap();
+            for year in db.sorted_years_of_genre(genre) {
+                // TODO: filter
+                store.append(&MediaListItem::new_year(year, filters.clone()));
+            }
+
+            Some(store.upcast())
+        }
+        (ObjectId::Genre(genre), Category::Artist) => {
+            let store = gio::ListStore::new::<MediaListItem>();
+
+            let db = database.read().unwrap();
+            for artist in db.sorted_artists_of_genre(genre) {
+                // TODO: filter
+                store.append(&MediaListItem::new_artist(artist, filters.clone(), &db));
+            }
+
+            Some(store.upcast())
+        }
         (ObjectId::Year(year), Category::Album) => {
             let store = gio::ListStore::new::<MediaListItem>();
 

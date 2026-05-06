@@ -26,13 +26,13 @@ use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
 // * more artists from musicbrainz?
-// * multi-level grouping modes
 // * library search
 // * volume control
 // * app settings: media directory, full rescan
 // * show cd if max cd > 1 in # column
 // * save library grouping mode
 // * unicode aware sorting
+// * placeholder album image
 
 // TODO: for 1.1
 // * translations

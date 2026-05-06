@@ -1,6 +1,6 @@
 use crate::database::musicbrainz::MusicBrainz;
 use crate::database::traverse_files::FilesDatabase;
-use crate::database::{Album, AlbumId, Artist, ArtistId, Database, Track, TrackId};
+use crate::database::{Album, AlbumId, Artist, ArtistId, Database, Genre, Track, TrackId};
 use itertools::Itertools;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
@@ -86,7 +86,7 @@ impl Scanner {
         let mut tracks = HashMap::new();
         let mut albums = HashMap::new();
         let mut artists = HashMap::new();
-        let mut genres = BTreeMap::<Option<Ustr>, HashSet<AlbumId>>::new();
+        let mut genres = BTreeMap::<Option<Ustr>, Genre>::new();
         let mut years: BTreeMap<_, HashSet<_>> = BTreeMap::new();
 
         let mut known_albums = HashMap::new();
@@ -245,10 +245,16 @@ impl Scanner {
             }
 
             if data.genres.is_empty() {
-                genres.entry(None).or_default().insert(album);
+                let entry = genres.entry(None).or_default();
+                entry.albums.insert(album);
+                entry.artists.extend(&found_album_artists);
+                entry.artists.extend(&found_track_artists);
             } else {
                 for genre in &data.genres {
-                    genres.entry(Some(*genre)).or_default().insert(album);
+                    let entry = genres.entry(Some(*genre)).or_default();
+                    entry.albums.insert(album);
+                    entry.artists.extend(&found_album_artists);
+                    entry.artists.extend(&found_track_artists);
                 }
             }
 

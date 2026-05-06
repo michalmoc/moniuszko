@@ -31,8 +31,8 @@ pub enum GroupingMode {
     ArtistAlbum,
     ArtistYearAlbum,
     GenreAlbum,
-    // GenreYearAlbum,
-    // GenreArtistAlbum,
+    GenreYearAlbum,
+    GenreArtistAlbum,
     YearAlbum,
 }
 
@@ -44,7 +44,8 @@ impl GroupingMode {
             "Artist / Album" => Some(GroupingMode::ArtistAlbum),
             "Artist / Year / Album" => Some(GroupingMode::ArtistYearAlbum),
             "Genre / Album" => Some(GroupingMode::GenreAlbum),
-            // "Genre / Year / Album" => Some(GroupingMode::GenreYearAlbum),
+            "Genre / Year / Album" => Some(GroupingMode::GenreYearAlbum),
+            "Genre / Artist / Album" => Some(GroupingMode::GenreArtistAlbum),
             "Year / Album" => Some(GroupingMode::YearAlbum),
             _ => None,
         }
@@ -57,7 +58,8 @@ impl GroupingMode {
             "Artist / Album",
             "Artist / Year / Album",
             "Genre / Album",
-            // "Genre / Year / Album",
+            "Genre / Year / Album",
+            "Genre / Artist / Album",
             "Year / Album",
         ]
     }
@@ -69,7 +71,8 @@ impl GroupingMode {
             GroupingMode::ArtistAlbum => Category::Artist,
             GroupingMode::ArtistYearAlbum => Category::Artist,
             GroupingMode::GenreAlbum => Category::Genre,
-            // GroupingMode::GenreYearAlbum => Category::Genre,
+            GroupingMode::GenreYearAlbum => Category::Genre,
+            GroupingMode::GenreArtistAlbum => Category::Genre,
             GroupingMode::YearAlbum => Category::Year,
         }
     }
@@ -91,11 +94,16 @@ impl GroupingMode {
                 Category::Genre => Category::Album,
                 _ => Category::Track,
             },
-            // GroupingMode::GenreYearAlbum => match category {
-            //     Category::Genre => Category::Year,
-            //     Category::Year => Category::Album,
-            //     _ => Category::Track,
-            // },
+            GroupingMode::GenreYearAlbum => match category {
+                Category::Genre => Category::Year,
+                Category::Year => Category::Album,
+                _ => Category::Track,
+            },
+            GroupingMode::GenreArtistAlbum => match category {
+                Category::Genre => Category::Artist,
+                Category::Artist => Category::Album,
+                _ => Category::Track,
+            },
             GroupingMode::YearAlbum => match category {
                 Category::Year => Category::Album,
                 _ => Category::Track,
