@@ -16,7 +16,6 @@ use gtk4::{
     Label, ListScrollFlags, MultiSelection, PickFlags, Shortcut, ShortcutController,
     SignalListItemFactory, Widget, gdk, gio,
 };
-use itertools::Itertools;
 use std::collections::HashSet;
 use std::fs;
 

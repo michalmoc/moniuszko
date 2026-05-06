@@ -28,9 +28,10 @@ pub struct FileData {
 
     pub album_artists: Option<Ustr>,
     pub album_artists_sort: Option<Ustr>,
+    pub album_artists_uuids: HashSet<Uuid>,
     pub track_artists: Option<Ustr>,
     pub track_artists_sort: Option<Ustr>,
-    pub artists_uuids: HashSet<Uuid>,
+    pub track_artists_uuids: HashSet<Uuid>,
 
     pub duration: Duration,
     pub year: Option<u16>,
@@ -93,11 +94,12 @@ impl Scanner {
         let mut known_artist_names = HashMap::new();
 
         for (path, data) in &self.files {
-            let mut found_artists = HashSet::new();
+            let mut found_album_artists = HashSet::new();
+            let mut found_track_artists = HashSet::new();
 
-            for uuid in &data.artists_uuids {
+            for uuid in &data.album_artists_uuids {
                 if let Some(artist_id) = known_artist_uuids.get(uuid) {
-                    found_artists.insert(*artist_id);
+                    found_album_artists.insert(*artist_id);
                 } else if let Some(name) = self.music_brainz.get_artist_name(uuid) {
                     let new_id = ArtistId::new();
 
@@ -112,56 +114,81 @@ impl Scanner {
                         },
                     );
 
-                    found_artists.insert(new_id);
+                    found_album_artists.insert(new_id);
                 };
             }
 
-            if found_artists.is_empty() {
+            for uuid in &data.track_artists_uuids {
+                if let Some(artist_id) = known_artist_uuids.get(uuid) {
+                    found_track_artists.insert(*artist_id);
+                } else if let Some(name) = self.music_brainz.get_artist_name(uuid) {
+                    let new_id = ArtistId::new();
+
+                    known_artist_uuids.insert(*uuid, new_id);
+                    artists.insert(
+                        new_id,
+                        Artist {
+                            uuid: *uuid,
+                            name: Some(name.name),
+                            sort: Some(name.sort),
+                            albums: Default::default(),
+                        },
+                    );
+
+                    found_track_artists.insert(new_id);
+                };
+            }
+
+            if found_album_artists.is_empty() {
                 // cannot get artists by uuid, so try to use simple tag
-                let name1 = data.album_artists;
-                let sort1 = data.album_artists_sort.or(name1);
-                let name2 = data.track_artists;
-                let sort2 = data.track_artists_sort.or(name2);
+                let name = data.album_artists;
+                let sort = data.album_artists_sort.or(name);
 
-                let artist_id1 = if let Some(artist_id) = known_artist_names.get(&(name1, sort1)) {
+                let artist_id = if let Some(artist_id) = known_artist_names.get(&(name, sort)) {
                     *artist_id
                 } else {
                     let new_id = ArtistId::new();
 
-                    known_artist_names.insert((name1, sort1), new_id);
+                    known_artist_names.insert((name, sort), new_id);
                     artists.insert(
                         new_id,
                         Artist {
                             uuid: Uuid::nil(),
-                            name: name1,
-                            sort: sort1,
+                            name,
+                            sort,
                             albums: Default::default(),
                         },
                     );
 
                     new_id
                 };
-                found_artists.insert(artist_id1);
+                found_album_artists.insert(artist_id);
+            }
 
-                let artist_id2 = if let Some(artist_id) = known_artist_names.get(&(name2, sort2)) {
+            if found_track_artists.is_empty() {
+                // cannot get artists by uuid, so try to use simple tag
+                let name = data.track_artists;
+                let sort = data.track_artists_sort.or(name);
+
+                let artist_id = if let Some(artist_id) = known_artist_names.get(&(name, sort)) {
                     *artist_id
                 } else {
                     let new_id = ArtistId::new();
 
-                    known_artist_names.insert((name2, sort2), new_id);
+                    known_artist_names.insert((name, sort), new_id);
                     artists.insert(
                         new_id,
                         Artist {
                             uuid: Uuid::nil(),
-                            name: name2,
-                            sort: sort2,
+                            name,
+                            sort,
                             albums: Default::default(),
                         },
                     );
 
                     new_id
                 };
-                found_artists.insert(artist_id2);
+                found_track_artists.insert(artist_id);
             }
 
             let album = if let Some(album_id) = known_albums.get(&(data.album_uuid, data.album)) {
@@ -227,7 +254,11 @@ impl Scanner {
 
             years.entry(data.year).or_default().insert(album);
 
-            for artist_id in &found_artists {
+            for artist_id in &found_track_artists {
+                artists.get_mut(artist_id).unwrap().albums.insert(album);
+            }
+
+            for artist_id in &found_album_artists {
                 artists.get_mut(artist_id).unwrap().albums.insert(album);
             }
 
@@ -242,6 +273,9 @@ impl Scanner {
                     cd: data.cd,
                     duration: data.duration,
                     artists: data.track_artists,
+                    artist_ids: found_track_artists,
+                    genres: HashSet::from_iter(data.genres.iter().copied()),
+                    year: data.year,
                 },
             );
         }
@@ -268,7 +302,6 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
             None => {
                 if let Some(stem) = path.file_stem() {
                     return Ok(FileData {
-                        // TODO: cd X position is not unique, and therefore they overwrite each other
                         track_id: id.unwrap_or_else(|| TrackId::new()),
                         title: stem.to_string_lossy().into(),
                         title_sort: stem.to_string_lossy().into(),
@@ -279,12 +312,13 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
                         position: Default::default(),
                         album_artists: Default::default(),
                         album_artists_sort: Default::default(),
+                        album_artists_uuids: Default::default(),
                         track_artists: Default::default(),
                         track_artists_sort: Default::default(),
-                        artists_uuids: Default::default(),
                         duration,
                         year: None,
                         genres: Default::default(),
+                        track_artists_uuids: Default::default(),
                     });
                 } else {
                     anyhow::bail!("cannot tag file");
@@ -323,14 +357,17 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         .get_string(ItemKey::AlbumArtistSortOrder)
         .map(|s| Ustr::from(&s))
         .or(album_artists);
+    let album_artists_uuids = tag
+        .get_strings(ItemKey::MusicBrainzReleaseArtistId)
+        .filter_map(|s| Uuid::parse_str(&s).ok())
+        .collect();
     let track_artists = tag.artist().map(|s| Ustr::from(&s));
     let track_artists_sort = tag
         .get_string(ItemKey::AlbumArtistSortOrder)
         .map(|s| Ustr::from(&s))
         .or(track_artists);
-    let artists_uuids = tag
+    let track_artists_uuids = tag
         .get_strings(ItemKey::MusicBrainzArtistId)
-        .chain(tag.get_strings(ItemKey::MusicBrainzReleaseArtistId))
         .filter_map(|s| Uuid::parse_str(&s).ok())
         .collect();
 
@@ -352,9 +389,10 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         position,
         album_artists,
         album_artists_sort,
+        album_artists_uuids,
         track_artists,
         track_artists_sort,
-        artists_uuids,
+        track_artists_uuids,
         duration,
         year,
         genres,

@@ -1,4 +1,5 @@
 use crate::database::{AlbumId, ArtistId, Database, ObjectId, TrackId};
+use gio::subclass::prelude::ObjectSubclassIsExt;
 use gtk4::glib;
 use gtk4::glib::Object;
 use ustr::Ustr;
@@ -15,6 +16,8 @@ mod imp {
     #[derive(Default, Properties)]
     #[properties(wrapper_type = super::MediaListItem)]
     pub struct MediaListItem {
+        pub filters: RefCell<Vec<ObjectId>>,
+
         #[property(get, set)]
         pub stored_object: Cell<ObjectId>,
 
@@ -41,14 +44,18 @@ glib::wrapper! {
 }
 
 impl MediaListItem {
-    pub fn new_track(track_id: TrackId, database: &Database) -> Self {
-        Object::builder()
+    pub fn new_track(track_id: TrackId, filters: Vec<ObjectId>, database: &Database) -> Self {
+        let obj: MediaListItem = Object::builder()
             .property("stored_object", ObjectId::from(track_id))
             .property("name", database[track_id].title.to_string())
-            .build()
+            .build();
+
+        obj.imp().filters.replace(filters);
+
+        obj
     }
 
-    pub fn new_album(album_id: AlbumId, database: &Database) -> Self {
+    pub fn new_album(album_id: AlbumId, filters: Vec<ObjectId>, database: &Database) -> Self {
         let s = database[album_id].title.to_string();
         let name = if !s.is_empty() {
             s
@@ -56,14 +63,18 @@ impl MediaListItem {
             String::from("[no album]")
         };
 
-        Object::builder()
+        let obj: MediaListItem = Object::builder()
             .property("stored_object", ObjectId::from(album_id))
             .property("name", name)
-            .build()
+            .build();
+
+        obj.imp().filters.replace(filters);
+
+        obj
     }
 
-    pub fn new_artist(artist_id: ArtistId, database: &Database) -> Self {
-        Object::builder()
+    pub fn new_artist(artist_id: ArtistId, filters: Vec<ObjectId>, database: &Database) -> Self {
+        let obj: MediaListItem = Object::builder()
             .property("stored_object", ObjectId::from(artist_id))
             .property(
                 "name",
@@ -72,11 +83,15 @@ impl MediaListItem {
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "[unknown artist]".to_string()),
             )
-            .build()
+            .build();
+
+        obj.imp().filters.replace(filters);
+
+        obj
     }
 
-    pub fn new_genre(genre: Option<Ustr>) -> Self {
-        Object::builder()
+    pub fn new_genre(genre: Option<Ustr>, filters: Vec<ObjectId>) -> Self {
+        let obj: MediaListItem = Object::builder()
             .property("stored_object", ObjectId::Genre(genre))
             .property(
                 "name",
@@ -84,17 +99,29 @@ impl MediaListItem {
                     .map(|genre| genre.to_string())
                     .unwrap_or("[no genre]".to_string()),
             )
-            .build()
+            .build();
+
+        obj.imp().filters.replace(filters);
+
+        obj
     }
 
-    pub fn new_year(year: Option<u16>) -> Self {
-        Object::builder()
+    pub fn new_year(year: Option<u16>, filters: Vec<ObjectId>) -> Self {
+        let obj: MediaListItem = Object::builder()
             .property("stored_object", ObjectId::from(year))
             .property(
                 "name",
                 year.map(|x| x.to_string())
                     .unwrap_or("[unknown year]".to_string()),
             )
-            .build()
+            .build();
+
+        obj.imp().filters.replace(filters);
+
+        obj
+    }
+
+    pub fn filters(&self) -> Vec<ObjectId> {
+        self.imp().filters.borrow().clone()
     }
 }

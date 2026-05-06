@@ -81,29 +81,31 @@ impl Ui {
             Category::Track => {
                 for track_id in db.sorted_tracks() {
                     self.top_store
-                        .append(&MediaListItem::new_track(track_id, &db));
+                        .append(&MediaListItem::new_track(track_id, vec![], &db));
                 }
             }
             Category::Album => {
                 for album_id in db.sorted_albums() {
                     self.top_store
-                        .append(&MediaListItem::new_album(album_id, &db));
+                        .append(&MediaListItem::new_album(album_id, vec![], &db));
                 }
             }
             Category::Artist => {
                 for artist_id in db.sorted_artists() {
                     self.top_store
-                        .append(&MediaListItem::new_artist(artist_id, &db));
+                        .append(&MediaListItem::new_artist(artist_id, vec![], &db));
                 }
             }
             Category::Genre => {
                 for genre in db.sorted_genres() {
-                    self.top_store.append(&MediaListItem::new_genre(genre));
+                    self.top_store
+                        .append(&MediaListItem::new_genre(genre, vec![]));
                 }
             }
             Category::Year => {
                 for year in db.sorted_years() {
-                    self.top_store.append(&MediaListItem::new_year(year));
+                    self.top_store
+                        .append(&MediaListItem::new_year(year, vec![]));
                 }
             }
         }
@@ -181,50 +183,67 @@ fn create(
     grouping_mode: &GroupingModePtr,
 ) -> Option<gio::ListModel> {
     let item = item.downcast_ref::<MediaListItem>().unwrap();
+    let grouping_mode = grouping_mode.get();
 
-    match item.stored_object() {
-        ObjectId::None => None,
-        ObjectId::TrackId(_) => None,
-        ObjectId::AlbumId(album_id) => {
+    let current = item.stored_object();
+    let current_category = Category::of(&current);
+    let next_category = grouping_mode.next_category(current_category);
+
+    let mut filters = item.filters();
+    filters.push(current);
+
+    match (current, next_category) {
+        (ObjectId::None, _) => None,
+        (ObjectId::TrackId(_), _) => None,
+        (ObjectId::AlbumId(album_id), Category::Track) => {
             let store = gio::ListStore::new::<MediaListItem>();
-
             let db = database.read().unwrap();
+
             for track in db.sorted_tracks_of_album(album_id) {
-                store.append(&MediaListItem::new_track(track, &db));
+                if db.track_matches_filter(track, &filters) {
+                    store.append(&MediaListItem::new_track(track, filters.clone(), &db));
+                }
             }
 
             Some(store.upcast())
         }
-        ObjectId::ArtistId(artist_id) => {
+        (ObjectId::ArtistId(artist_id), Category::Album) => {
             let store = gio::ListStore::new::<MediaListItem>();
 
             let db = database.read().unwrap();
             for album in db.sorted_albums_of_artist(artist_id) {
-                store.append(&MediaListItem::new_album(album, &db));
+                // TODO: filter
+                store.append(&MediaListItem::new_album(album, filters.clone(), &db));
             }
 
             Some(store.upcast())
         }
-        ObjectId::Genre(genre) => {
+        (ObjectId::Genre(genre), Category::Album) => {
             let store = gio::ListStore::new::<MediaListItem>();
 
             let db = database.read().unwrap();
             for album in db.sorted_albums_of_genre(genre) {
-                store.append(&MediaListItem::new_album(album, &db));
+                // TODO: filter
+                store.append(&MediaListItem::new_album(album, filters.clone(), &db));
             }
 
             Some(store.upcast())
         }
-        ObjectId::Year(year) => {
+        (ObjectId::Year(year), Category::Album) => {
             let store = gio::ListStore::new::<MediaListItem>();
 
             let db = database.read().unwrap();
             for album in db.sorted_albums_of_year(year) {
-                store.append(&MediaListItem::new_album(album, &db));
+                // TODO: filter
+                store.append(&MediaListItem::new_album(album, filters.clone(), &db));
             }
 
             Some(store.upcast())
         }
+        _ => panic!(
+            "cannot get {:?} out of {:?}",
+            next_category, current_category
+        ),
     }
 }
 

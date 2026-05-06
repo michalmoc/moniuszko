@@ -91,8 +91,11 @@ pub struct Track {
     pub position: Option<u32>,
 
     pub artists: Option<Ustr>,
+    pub artist_ids: HashSet<ArtistId>,
 
     pub duration: Duration,
+    pub year: Option<u16>,
+    pub genres: HashSet<Ustr>,
 }
 
 pub struct Album {
@@ -185,6 +188,49 @@ impl Database {
 
     pub fn sorted_genres(&self) -> impl Iterator<Item = Option<Ustr>> {
         self.genres.keys().copied()
+    }
+
+    pub fn track_matches_filter(&self, track_id: TrackId, filter: &Vec<ObjectId>) -> bool {
+        let track = &self[track_id];
+
+        for object in filter {
+            match object {
+                ObjectId::None => {}
+                ObjectId::TrackId(t) => {
+                    if *t != track_id {
+                        return false;
+                    }
+                }
+                ObjectId::AlbumId(album_id) => {
+                    if track.album != *album_id {
+                        return false;
+                    }
+                }
+                ObjectId::ArtistId(artist_id) => {
+                    if !track.artist_ids.contains(&artist_id) {
+                        return false;
+                    }
+                }
+                ObjectId::Genre(genre) => {
+                    if let Some(genre) = genre {
+                        if !track.genres.contains(&genre) {
+                            return false;
+                        }
+                    } else {
+                        if !track.genres.is_empty() {
+                            return false;
+                        }
+                    }
+                }
+                ObjectId::Year(year) => {
+                    if track.year != *year {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
     }
 }
 
