@@ -4,7 +4,7 @@ use adw::glib::Propagation;
 use gio::prelude::{Cast, ListModelExt};
 use gtk4::glib::Binding;
 use gtk4::prelude::{BoxExt, ButtonExt, CastNone, ObjectExt, RangeExt, WidgetExt};
-use gtk4::{Adjustment, Button, Label, Orientation, Scale, Widget};
+use gtk4::{Adjustment, Button, Label, Orientation, Scale, ScaleButton, Widget};
 
 #[derive(Clone)]
 pub struct Ui {
@@ -62,9 +62,14 @@ impl Ui {
         progress_box.append(&progress);
         progress_box.append(&time_full);
 
-        let volume_button = Button::from_icon_name("multimedia-volume-control");
+        let volume_button = ScaleButton::new(0.0, 1.0, 0.01, &["multimedia-volume-control"]);
         volume_button.add_css_class("flat");
         volume_button.add_css_class("dimmed");
+        playback_state
+            .bind_property("volume", &volume_button, "value")
+            .bidirectional()
+            .sync_create()
+            .build();
 
         let back_button = Button::from_icon_name("media-skip-backward");
         back_button.add_css_class("suggested-action");

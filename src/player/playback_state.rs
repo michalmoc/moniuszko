@@ -31,6 +31,9 @@ mod imp {
         #[property(get, set, default)]
         pub repeat_mode: Cell<RepeatMode>,
 
+        #[property(get, set)]
+        pub volume: Cell<f64>,
+
         #[property(get, set=Self::change_current, nullable)]
         pub current: RefCell<Option<PlaylistItem>>,
 
@@ -83,6 +86,10 @@ mod imp {
                     .bind_property("ended", obj.as_ref(), "ended")
                     .sync_create()
                     .build();
+                obj.bind_property("volume", medium, "volume")
+                    .bidirectional()
+                    .sync_create()
+                    .build();
             }
         }
     }
@@ -94,7 +101,7 @@ glib::wrapper! {
 
 impl PlaybackState {
     pub fn new() -> Self {
-        Object::builder().build()
+        Object::builder().property("volume", 1.0).build()
     }
 
     pub fn seek(&self, progress: i64) {
