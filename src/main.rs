@@ -7,7 +7,7 @@ mod playlist;
 
 use crate::config::{Config, ConfigPtr};
 use crate::constants::{APP_ID, APP_NAME};
-use crate::database::{DatabasePtr, Scanner, ScannerPtr};
+use crate::database::{DatabasePtr, Scanner, ScannerPtr, SearchResult, SearchResultPtr};
 use crate::media_library::{GroupingMode, GroupingModePtr};
 use adw::glib::Propagation;
 use gtk::prelude::*;
@@ -15,9 +15,10 @@ use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
 use gtk4::gdk::Display;
 use gtk4::{
-    Button, CssProvider, DropDown, Expression, Orientation, Paned, StringList, StringObject,
+    Button, CssProvider, DropDown, Expression, Orientation, Paned, SearchEntry, StringList,
+    StringObject,
 };
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::fs;
 use std::fs::File;
 use std::ops::Deref;
@@ -26,13 +27,13 @@ use std::sync::{Arc, RwLock};
 
 // TODO: for 1.0
 // * more artists from musicbrainz?
-// * library search
 // * volume control
 // * app settings: media directory, full rescan
 // * show cd if max cd > 1 in # column
 // * save library grouping mode
 // * unicode aware sorting
 // * placeholder album image
+// * keep images after grouping or search changes
 
 // TODO: for 1.1
 // * translations
@@ -130,7 +131,14 @@ fn build_ui(
     box_.append(&playlist_sw);
     box_.append(&player.widget());
 
-    let media_library = media_library::Ui::new(database.clone(), grouping_mode.clone());
+    let search = SearchEntry::new();
+    let search_result = Rc::new(RefCell::new(SearchResult::default()));
+
+    let media_library = media_library::Ui::new(
+        database.clone(),
+        grouping_mode.clone(),
+        search_result.clone(),
+    );
     media_library.repopulate();
     media_library.widget().set_vexpand(true);
     let playlist_clone = playlist.clone();
@@ -185,7 +193,14 @@ fn build_ui(
     library_bottom_box.append(&grouping_mode_choice);
     library_bottom_box.append(&refresh_button);
 
+    let media_library_clone = media_library.clone();
+    let database_clone = database.clone();
+    search.connect_search_changed(move |s| {
+        on_search_changed(s, &search_result, &database_clone, &media_library_clone)
+    });
+
     let media_library_box = gtk4::Box::new(Orientation::Vertical, 0);
+    media_library_box.append(&search);
     media_library_box.append(&media_library_sw);
     media_library_box.append(&library_bottom_box);
 
@@ -258,5 +273,16 @@ fn on_grouping_mode_change(
     library: &media_library::Ui,
 ) {
     grouping_mode.set(GroupingMode::from_str(selected).unwrap());
+    library.repopulate();
+}
+
+fn on_search_changed(
+    searcher: &SearchEntry,
+    search_result: &SearchResultPtr,
+    database: &DatabasePtr,
+    library: &media_library::Ui,
+) {
+    let result = database.read().unwrap().search(&searcher.text());
+    search_result.replace(result);
     library.repopulate();
 }

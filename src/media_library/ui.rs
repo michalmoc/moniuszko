@@ -1,4 +1,4 @@
-use crate::database::{AlbumId, Database, DatabasePtr, ObjectId};
+use crate::database::{AlbumId, Database, DatabasePtr, ObjectId, SearchResultPtr};
 use crate::media_library::grouping_mode::{Category, GroupingModePtr};
 use crate::media_library::ui_item::MediaListItem;
 use crate::playlist::ObjectIds;
@@ -14,6 +14,8 @@ use gtk4::{
 use lofty::picture::PictureType;
 use lofty::prelude::TaggedFileExt;
 use lofty::probe::Probe;
+use std::cell::Cell;
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct Ui {
@@ -22,10 +24,15 @@ pub struct Ui {
     widget: ListView,
     database: DatabasePtr,
     grouping_mode: GroupingModePtr,
+    search_result: SearchResultPtr,
 }
 
 impl Ui {
-    pub fn new(database: DatabasePtr, grouping_mode: GroupingModePtr) -> Self {
+    pub fn new(
+        database: DatabasePtr,
+        grouping_mode: GroupingModePtr,
+        search_result: SearchResultPtr,
+    ) -> Self {
         let factory = SignalListItemFactory::new();
         factory.connect_setup(tree_setup);
         let database_clone = database.clone();
@@ -34,8 +41,14 @@ impl Ui {
         let store = gio::ListStore::new::<MediaListItem>();
         let database_clone = database.clone();
         let grouping_mode_clone = grouping_mode.clone();
+        let search_result_clone = search_result.clone();
         let model = TreeListModel::new(store.clone(), false, false, move |i| {
-            create(i, &database_clone, &grouping_mode_clone)
+            create(
+                i,
+                &database_clone,
+                &grouping_mode_clone,
+                &search_result_clone,
+            )
         });
 
         let selection = MultiSelection::new(Some(model.clone()));
@@ -52,6 +65,7 @@ impl Ui {
             tree_store: model,
             database,
             grouping_mode,
+            search_result,
         }
     }
 
@@ -75,37 +89,48 @@ impl Ui {
         self.top_store.remove_all();
 
         let db = self.database.read().unwrap();
+        let search_result = self.search_result.borrow();
         let mode = self.grouping_mode.get();
 
         match mode.top_category() {
             Category::Track => {
                 for track_id in db.sorted_tracks() {
-                    self.top_store
-                        .append(&MediaListItem::new_track(track_id, vec![], &db));
+                    if search_result.has_track(track_id) {
+                        self.top_store
+                            .append(&MediaListItem::new_track(track_id, vec![], &db));
+                    }
                 }
             }
             Category::Album => {
                 for album_id in db.sorted_albums() {
-                    self.top_store
-                        .append(&MediaListItem::new_album(album_id, vec![], &db));
+                    if search_result.has_album(album_id) {
+                        self.top_store
+                            .append(&MediaListItem::new_album(album_id, vec![], &db));
+                    }
                 }
             }
             Category::Artist => {
                 for artist_id in db.sorted_artists() {
-                    self.top_store
-                        .append(&MediaListItem::new_artist(artist_id, vec![], &db));
+                    if search_result.has_artist(artist_id) {
+                        self.top_store
+                            .append(&MediaListItem::new_artist(artist_id, vec![], &db));
+                    }
                 }
             }
             Category::Genre => {
                 for genre in db.sorted_genres() {
-                    self.top_store
-                        .append(&MediaListItem::new_genre(genre, vec![]));
+                    if search_result.has_genre(genre) {
+                        self.top_store
+                            .append(&MediaListItem::new_genre(genre, vec![]));
+                    }
                 }
             }
             Category::Year => {
                 for year in db.sorted_years() {
-                    self.top_store
-                        .append(&MediaListItem::new_year(year, vec![]));
+                    if search_result.has_year(year) {
+                        self.top_store
+                            .append(&MediaListItem::new_year(year, vec![]));
+                    }
                 }
             }
         }
@@ -181,6 +206,7 @@ fn create(
     item: &Object,
     database: &DatabasePtr,
     grouping_mode: &GroupingModePtr,
+    search_result: &SearchResultPtr,
 ) -> Option<gio::ListModel> {
     let item = item.downcast_ref::<MediaListItem>().unwrap();
     let grouping_mode = grouping_mode.get();
@@ -198,9 +224,10 @@ fn create(
         (ObjectId::AlbumId(album_id), Category::Track) => {
             let store = gio::ListStore::new::<MediaListItem>();
             let db = database.read().unwrap();
+            let search_result = search_result.borrow();
 
             for track in db.sorted_tracks_of_album(album_id) {
-                if db.track_matches_filter(track, &filters) {
+                if db.track_matches_filter(track, &filters) && search_result.has_track(track) {
                     store.append(&MediaListItem::new_track(track, filters.clone(), &db));
                 }
             }
@@ -209,10 +236,11 @@ fn create(
         }
         (ObjectId::ArtistId(artist_id), Category::Album) => {
             let store = gio::ListStore::new::<MediaListItem>();
-
             let db = database.read().unwrap();
+            let search_result = search_result.borrow();
+
             for album in db.sorted_albums_of_artist(artist_id) {
-                if db.album_matches_filter(album, &filters) {
+                if db.album_matches_filter(album, &filters) && search_result.has_album(album) {
                     store.append(&MediaListItem::new_album(album, filters.clone(), &db));
                 }
             }
@@ -221,21 +249,25 @@ fn create(
         }
         (ObjectId::ArtistId(artist_id), Category::Year) => {
             let store = gio::ListStore::new::<MediaListItem>();
-
             let db = database.read().unwrap();
+            let search_result = search_result.borrow();
+
             for year in db.sorted_years_of_artist(artist_id) {
-                // TODO: filter
-                store.append(&MediaListItem::new_year(year, filters.clone()));
+                // TODO: _matches_filter
+                if search_result.has_year(year) {
+                    store.append(&MediaListItem::new_year(year, filters.clone()));
+                }
             }
 
             Some(store.upcast())
         }
         (ObjectId::Genre(genre), Category::Album) => {
             let store = gio::ListStore::new::<MediaListItem>();
-
             let db = database.read().unwrap();
+            let search_result = search_result.borrow();
+
             for album in db.sorted_albums_of_genre(genre) {
-                if db.album_matches_filter(album, &filters) {
+                if db.album_matches_filter(album, &filters) && search_result.has_album(album) {
                     store.append(&MediaListItem::new_album(album, filters.clone(), &db));
                 }
             }
@@ -244,32 +276,39 @@ fn create(
         }
         (ObjectId::Genre(genre), Category::Year) => {
             let store = gio::ListStore::new::<MediaListItem>();
-
             let db = database.read().unwrap();
+            let search_result = search_result.borrow();
+
             for year in db.sorted_years_of_genre(genre) {
-                // TODO: filter
-                store.append(&MediaListItem::new_year(year, filters.clone()));
+                // TODO: _matches_filter
+                if search_result.has_year(year) {
+                    store.append(&MediaListItem::new_year(year, filters.clone()));
+                }
             }
 
             Some(store.upcast())
         }
         (ObjectId::Genre(genre), Category::Artist) => {
             let store = gio::ListStore::new::<MediaListItem>();
-
             let db = database.read().unwrap();
+            let search_result = search_result.borrow();
+
             for artist in db.sorted_artists_of_genre(genre) {
-                // TODO: filter
-                store.append(&MediaListItem::new_artist(artist, filters.clone(), &db));
+                // TODO: _matches_filter
+                if search_result.has_artist(artist) {
+                    store.append(&MediaListItem::new_artist(artist, filters.clone(), &db));
+                }
             }
 
             Some(store.upcast())
         }
         (ObjectId::Year(year), Category::Album) => {
             let store = gio::ListStore::new::<MediaListItem>();
-
             let db = database.read().unwrap();
+            let search_result = search_result.borrow();
+
             for album in db.sorted_albums_of_year(year) {
-                if db.album_matches_filter(album, &filters) {
+                if db.album_matches_filter(album, &filters) && search_result.has_album(album) {
                     store.append(&MediaListItem::new_album(album, filters.clone(), &db));
                 }
             }

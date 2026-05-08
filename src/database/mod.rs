@@ -5,9 +5,11 @@ mod traverse_files;
 use gtk4::glib;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Index;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use ustr::Ustr;
@@ -118,6 +120,53 @@ pub struct Artist {
 pub struct Genre {
     albums: HashSet<AlbumId>,
     artists: HashSet<ArtistId>,
+}
+
+/// None means full set
+#[derive(Default)]
+pub struct SearchResult {
+    tracks: Option<HashSet<TrackId>>,
+    albums: Option<HashSet<AlbumId>>,
+    years: Option<HashSet<Option<u16>>>,
+    artists: Option<HashSet<ArtistId>>,
+    genres: Option<HashSet<Option<Ustr>>>,
+}
+
+impl SearchResult {
+    pub fn has_track(&self, id: TrackId) -> bool {
+        self.tracks
+            .as_ref()
+            .map(|container| container.contains(&id))
+            .unwrap_or(true)
+    }
+
+    pub fn has_album(&self, id: AlbumId) -> bool {
+        self.albums
+            .as_ref()
+            .map(|container| container.contains(&id))
+            .unwrap_or(true)
+    }
+
+    pub fn has_year(&self, id: Option<u16>) -> bool {
+        self.years
+            .as_ref()
+            .map(|container| container.contains(&id))
+            .unwrap_or(true)
+    }
+
+    pub fn has_artist(&self, id: ArtistId) -> bool {
+        self.artists
+            .as_ref()
+            .map(|container| container.contains(&id))
+            .unwrap_or(true)
+    }
+
+    pub fn has_genre(&self, id: Option<Ustr>) -> bool {
+        self.genres
+            .as_ref()
+            .map(|container| container.contains(&id))
+            .unwrap_or(true)
+    }
 }
 
 #[derive(Default)]
@@ -277,8 +326,6 @@ impl Database {
     }
 
     pub fn album_matches_filter(&self, album_id: AlbumId, filter: &Vec<ObjectId>) -> bool {
-        let album = &self[album_id];
-
         for object in filter {
             match object {
                 ObjectId::None => {}
@@ -312,6 +359,61 @@ impl Database {
 
         true
     }
+
+    fn keyword_in_track(&self, keyword: &str, track: &Track) -> bool {
+        if track.title.contains(keyword) {
+            return true;
+        }
+
+        if let Some(artists) = track.artists
+            && artists.contains(keyword)
+        {
+            return true;
+        }
+
+        if self[track.album].title.contains(keyword) {
+            return true;
+        }
+
+        false
+    }
+
+    pub fn search(&self, text: &str) -> SearchResult {
+        let keywords = text.split_whitespace().collect_vec();
+
+        if keywords.is_empty() {
+            return SearchResult::default();
+        }
+
+        let mut tracks = HashSet::new();
+        let mut albums = HashSet::new();
+        let mut artists = HashSet::new();
+        let mut genres = HashSet::new();
+        let mut years = HashSet::new();
+
+        for (track_id, track) in &self.tracks {
+            if keywords.iter().all(|k| self.keyword_in_track(k, track)) {
+                tracks.insert(*track_id);
+                albums.insert(track.album);
+                artists.extend(&track.artist_ids);
+                years.insert(track.year);
+
+                if track.genres.is_empty() {
+                    genres.insert(None);
+                } else {
+                    genres.extend(track.genres.iter().copied().map(Some));
+                }
+            }
+        }
+
+        SearchResult {
+            tracks: Some(tracks),
+            albums: Some(albums),
+            years: Some(years),
+            artists: Some(artists),
+            genres: Some(genres),
+        }
+    }
 }
 
 impl Index<TrackId> for Database {
@@ -343,5 +445,7 @@ impl Database {
         Default::default()
     }
 }
+
+pub type SearchResultPtr = Rc<RefCell<SearchResult>>;
 
 pub type DatabasePtr = Arc<RwLock<Database>>;
