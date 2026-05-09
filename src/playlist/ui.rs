@@ -95,6 +95,10 @@ impl Ui {
         }
     }
 
+    pub fn clear(&self) {
+        self.store.remove_all();
+    }
+
     pub fn connect_activate<F: Fn(u32) + 'static>(&self, f: F) {
         self.widget.connect_activate(move |_, p| f(p));
     }

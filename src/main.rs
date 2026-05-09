@@ -7,16 +7,21 @@ mod playlist;
 
 use crate::config::{Config, ConfigPtr};
 use crate::constants::{APP_ID, APP_NAME};
-use crate::database::{DatabasePtr, Scanner, ScannerPtr, SearchResult, SearchResultPtr};
+use crate::database::{Database, DatabasePtr, Scanner, ScannerPtr, SearchResult, SearchResultPtr};
 use crate::media_library::{GroupingMode, GroupingModePtr};
 use adw::glib::Propagation;
+use adw::prelude::{
+    AdwDialogExt, EntryRowExt, PreferencesDialogExt, PreferencesGroupExt, PreferencesPageExt,
+    PreferencesRowExt,
+};
+use adw::{ActionRow, ButtonRow, EntryRow, PreferencesGroup, PreferencesPage};
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
 use gtk4::gdk::Display;
 use gtk4::{
-    Button, CssProvider, DropDown, Expression, Orientation, Paned, SearchEntry, StringList,
-    StringObject,
+    Button, CssProvider, DropDown, Expression, HeaderBar, Orientation, Paned, SearchEntry,
+    StringList, StringObject,
 };
 use std::cell::{Cell, RefCell};
 use std::fs;
@@ -24,16 +29,6 @@ use std::fs::File;
 use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-
-// TODO: for 1.0
-// * more artists from musicbrainz?
-// * app settings: media directory, full rescan
-// * show cd if max cd > 1 in # column
-// * save library grouping mode
-// * unicode aware sorting
-// * placeholder album image
-// * keep images after grouping or search changes
-// * search ignore case
 
 // TODO: for 1.1
 // * translations
@@ -52,6 +47,15 @@ use std::sync::{Arc, RwLock};
 // * panel with details of current piece (including lyrics)
 // * separate library for audiobooks
 // * save last timestamp in audiobooks
+
+// TODO: other
+// * more artists from musicbrainz?
+// * show cd if max cd > 1 in # column
+// * save library grouping mode
+// * unicode aware sorting
+// * placeholder album image
+// * keep images after grouping or search changes
+// * search ignore case
 
 fn main() -> glib::ExitCode {
     let config = Config::load().unwrap();
@@ -105,8 +109,14 @@ fn build_ui(
     config: &ConfigPtr,
     grouping_mode: &GroupingModePtr,
 ) {
+    let config_button = Button::from_icon_name("applications-system");
+
+    let titlebar = HeaderBar::new();
+    titlebar.pack_start(&config_button);
+
     let window = ApplicationWindow::builder()
         .application(app)
+        .titlebar(&titlebar)
         .title(APP_NAME)
         .default_width(config.read().unwrap().window_width)
         .default_height(config.read().unwrap().window_height)
@@ -208,6 +218,23 @@ fn build_ui(
     paned.set_start_child(Some(&media_library_box));
     paned.set_end_child(Some(&box_));
 
+    let window_clone = window.clone().upcast();
+    let config_clone = config.clone();
+    let database_clone = database.clone();
+    let playlist_clone = playlist.clone();
+    let media_library_clone = media_library.clone();
+    let scanner_clone = scanner.clone();
+    config_button.connect_clicked(move |_| {
+        on_config_clicked(
+            &window_clone,
+            &config_clone,
+            &database_clone,
+            &scanner_clone,
+            &media_library_clone,
+            &playlist_clone,
+        )
+    });
+
     let config_clone = config.clone();
     window.connect_close_request(move |window| {
         let mut cfg = config_clone.write().unwrap();
@@ -285,4 +312,63 @@ fn on_search_changed(
     let result = database.read().unwrap().search(&searcher.text());
     search_result.replace(result);
     library.repopulate();
+}
+
+fn clear_library(
+    database: &DatabasePtr,
+    scanner: &ScannerPtr,
+    media_library: &media_library::Ui,
+    playlist: &playlist::Ui,
+) {
+    *database.write().unwrap() = Database::default();
+    *scanner.write().unwrap() = Scanner::default();
+    media_library.repopulate();
+    playlist.clear();
+}
+
+fn on_config_clicked(
+    window: &gtk::Window,
+    config: &ConfigPtr,
+    database: &DatabasePtr,
+    scanner: &ScannerPtr,
+    media_library: &media_library::Ui,
+    playlist: &playlist::Ui,
+) {
+    let media_path = EntryRow::new();
+    media_path.set_title("media path");
+    media_path.set_text(&config.read().unwrap().media_path.to_string_lossy());
+    media_path.set_show_apply_button(true);
+
+    let config_clone = config.clone();
+    media_path.connect_apply(move |entry| {
+        config_clone.write().unwrap().media_path = entry.text().into();
+    });
+
+    let full_rescan = ButtonRow::new();
+    full_rescan.set_title("clear database");
+    full_rescan.set_end_icon_name(Some("view-refresh"));
+    let database_clone = database.clone();
+    let scanner_clone = scanner.clone();
+    let media_library_clone = media_library.clone();
+    let playlist_clone = playlist.clone();
+    full_rescan.connect_activated(move |_| {
+        clear_library(
+            &database_clone,
+            &scanner_clone,
+            &media_library_clone,
+            &playlist_clone,
+        )
+    });
+
+    let group = PreferencesGroup::new();
+    group.set_title("Main");
+    group.add(&media_path);
+    group.add(&full_rescan);
+
+    let page = PreferencesPage::new();
+    page.add(&group);
+
+    let dialog = adw::PreferencesDialog::new();
+    dialog.add(&page);
+    dialog.present(Some(window));
 }

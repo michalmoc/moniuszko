@@ -22,4 +22,4 @@ musicbrainz_rs = { version = "0.13.0", features = ["sync"] }
 [dependencies.adw]
 package = "libadwaita"
 version = "0.9.1"
-features = ["v1_7"]
+features = ["v1_8"]
