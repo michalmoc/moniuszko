@@ -4,7 +4,7 @@ use dirs::{audio_dir, config_local_dir};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 #[derive(Serialize, Deserialize, Debug)]

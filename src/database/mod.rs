@@ -5,7 +5,7 @@ mod traverse_files;
 use gtk4::glib;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Index;
 use std::path::PathBuf;

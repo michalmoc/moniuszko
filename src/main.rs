@@ -14,7 +14,7 @@ use adw::prelude::{
     AdwDialogExt, EntryRowExt, PreferencesDialogExt, PreferencesGroupExt, PreferencesPageExt,
     PreferencesRowExt,
 };
-use adw::{ActionRow, ButtonRow, EntryRow, PreferencesGroup, PreferencesPage};
+use adw::{ButtonRow, EntryRow, PreferencesGroup, PreferencesPage};
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
@@ -29,33 +29,6 @@ use std::fs::File;
 use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-
-// TODO: for 1.1
-// * translations
-// * mpris
-// * system tray
-// * enable tray in app settings
-// * right-click menu on playlist and library
-
-// TODO: for 1.2
-// * many playlists
-// * save/load playlist
-// * undo/redo playlist changes
-// * random modes
-
-// TODO: for 1.3
-// * panel with details of current piece (including lyrics)
-// * separate library for audiobooks
-// * save last timestamp in audiobooks
-
-// TODO: other
-// * more artists from musicbrainz?
-// * show cd if max cd > 1 in # column
-// * save library grouping mode
-// * unicode aware sorting
-// * placeholder album image
-// * keep images after grouping or search changes
-// * search ignore case
 
 fn main() -> glib::ExitCode {
     let config = Config::load().unwrap();

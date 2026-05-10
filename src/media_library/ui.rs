@@ -14,8 +14,6 @@ use gtk4::{
 use lofty::picture::PictureType;
 use lofty::prelude::TaggedFileExt;
 use lofty::probe::Probe;
-use std::cell::Cell;
-use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct Ui {
