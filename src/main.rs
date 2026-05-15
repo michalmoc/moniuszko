@@ -116,7 +116,15 @@ fn build_ui(
         .build();
 
     let playback_state = PlaybackState::new();
-    let player = player::new(playback_state.clone(), sender.clone());
+    let playback_state_clone = playback_state.clone();
+    let commands_clone = sender.clone();
+    playback_state.connect_ended_notify(move |_| {
+        if playback_state_clone.ended() {
+            commands_clone.send_blocking(Command::Next).unwrap();
+        }
+    });
+
+    let player = player::new(&playback_state, sender.clone());
 
     let sender_clone = sender.clone();
     playlist.connect_activate(move |p| sender_clone.send_blocking(Command::Play(p)).unwrap());
