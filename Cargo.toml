@@ -19,3 +19,5 @@ lofty = "0.23.3"
 rand = "0.10.1"
 itertools = "0.14.0"
 musicbrainz_rs = { version = "0.13.0", features = ["sync"] }
+zbus = "5.15.0"
+async-channel = "2.5.0"

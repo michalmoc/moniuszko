@@ -1,14 +1,19 @@
+mod commands;
 mod config;
 mod constants;
 pub mod database;
 mod media_library;
+mod mpris;
 mod player;
 mod playlist;
 
+use crate::commands::{Command, process_commands};
 use crate::config::{Config, ConfigPtr};
 use crate::constants::{APP_ID, APP_NAME};
 use crate::database::{Database, DatabasePtr, Scanner, ScannerPtr, SearchResult, SearchResultPtr};
 use crate::media_library::{GroupingMode, GroupingModePtr};
+use crate::mpris::mpris;
+use crate::player::PlaybackState;
 use adw::glib::Propagation;
 use adw::prelude::{
     AdwDialogExt, EntryRowExt, PreferencesDialogExt, PreferencesGroupExt, PreferencesPageExt,
@@ -60,7 +65,9 @@ fn main() -> glib::ExitCode {
         )
     });
 
-    application.run()
+    let result = application.run();
+
+    result
 }
 
 fn load_css() {
@@ -82,6 +89,9 @@ fn build_ui(
     config: &ConfigPtr,
     grouping_mode: &GroupingModePtr,
 ) {
+    let (sender, receiver) = async_channel::unbounded();
+    glib::spawn_future_local(mpris(sender.clone()));
+
     let config_button = Button::from_icon_name("applications-system");
 
     let titlebar = HeaderBar::new();
@@ -105,14 +115,15 @@ fn build_ui(
         .hexpand(true)
         .build();
 
-    let player = player::Ui::new(playlist.store());
+    let playback_state = PlaybackState::new();
+    let player = player::new(playback_state.clone(), sender.clone());
 
-    let player_clone = player.clone();
-    playlist.connect_activate(move |p| player_clone.play(p));
+    let sender_clone = sender.clone();
+    playlist.connect_activate(move |p| sender_clone.send_blocking(Command::Play(p)).unwrap());
 
     let box_ = gtk4::Box::new(Orientation::Vertical, 0);
     box_.append(&playlist_sw);
-    box_.append(&player.widget());
+    box_.append(&player);
 
     let search = SearchEntry::new();
     let search_result = Rc::new(RefCell::new(SearchResult::default()));
@@ -223,6 +234,13 @@ fn build_ui(
     window.set_child(Some(&paned));
 
     window.present();
+
+    glib::spawn_future_local(process_commands(
+        receiver,
+        window.upcast(),
+        playlist.store().clone(),
+        playback_state,
+    ));
 }
 
 fn refresh_button_cb(
