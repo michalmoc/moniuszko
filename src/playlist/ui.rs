@@ -1,9 +1,8 @@
-use crate::config::ConfigPtr;
 use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
-use crate::playlist::ObjectIds;
 use crate::playlist::box_with_playlist_entry::BoxWithPlaylistEntry;
 use crate::playlist::ui_item::PlaylistItem;
-use gio::prelude::{ListModelExt, ListModelExtManual};
+use crate::playlist::{ObjectIds, Playlist};
+use gio::prelude::ListModelExt;
 use gtk4::gdk::{Drag, DragAction, Key, ModifierType};
 use gtk4::glib::{Object, Propagation, Value, Variant};
 use gtk4::graphene::Point;
@@ -17,54 +16,38 @@ use gtk4::{
     SignalListItemFactory, Widget, gdk, gio,
 };
 use std::collections::HashSet;
-use std::fs;
 
 #[derive(Clone)]
 pub struct Ui {
-    store: gio::ListStore,
+    playlist: Playlist,
     widget: ColumnView,
     database: DatabasePtr,
 }
 
 impl Ui {
-    pub fn new(database: &DatabasePtr, config: &ConfigPtr) -> Self {
-        let store = gio::ListStore::new::<PlaylistItem>();
-        let path = config.read().unwrap().playlists_path();
-        if let Ok(file) = fs::File::open(path) {
-            let tracks: Vec<TrackId> = serde_json::from_reader(file).unwrap();
-            let db = database.read().unwrap();
-            for track_id in tracks {
-                if db.has_track(track_id) {
-                    store.append(&PlaylistItem::new(track_id, &db));
-                }
-            }
-        }
-
-        let config_clone = config.clone();
-        store.connect_items_changed(move |list, _, _, _| save_playlist(list, &config_clone));
-
-        let selection = MultiSelection::new(Some(store.clone()));
+    pub fn new(database: &DatabasePtr, playlist: Playlist) -> Self {
+        let selection = MultiSelection::new(Some(playlist.inner().clone()));
 
         let drop_target = DropTarget::new(ObjectIds::static_type(), DragAction::all());
-        let store_clone = store.clone();
+        let playlist_clone = playlist.clone();
         let database_clone = database.clone();
         drop_target
-            .connect_drop(move |t, v, x, y| on_drop(t, v, x, y, &store_clone, &database_clone));
+            .connect_drop(move |t, v, x, y| on_drop(t, v, x, y, &playlist_clone, &database_clone));
 
         let drag_source = DragSource::new();
         drag_source.set_actions(DragAction::MOVE);
-        let store_clone = store.clone();
-        drag_source.connect_prepare(move |s, x, y| prepare_drag(s, x, y, &store_clone));
-        let store_clone = store.clone();
-        drag_source.connect_drag_end(move |s, d, r| drag_end(s, d, r, &store_clone));
+        let playlist_clone = playlist.clone();
+        drag_source.connect_prepare(move |s, x, y| prepare_drag(s, x, y, &playlist_clone));
+        let playlist_clone = playlist.clone();
+        drag_source.connect_drag_end(move |s, d, r| drag_end(s, d, r, &playlist_clone));
 
         let shortcut_controller = ShortcutController::new();
-        let store_clone = store.clone();
+        let playlist_clone = playlist.clone();
         shortcut_controller.add_shortcut(
             Shortcut::builder()
                 .trigger(&KeyvalTrigger::new(Key::Delete, ModifierType::empty()))
                 .action(&CallbackAction::new(move |w, a| {
-                    on_delete(w, a, &store_clone)
+                    on_delete(w, a, &playlist_clone)
                 }))
                 .build(),
         );
@@ -81,22 +64,10 @@ impl Ui {
         view.append_column(&Column::new_numeric("duration", "duration").build());
 
         Self {
-            store,
+            playlist,
             widget: view,
             database: database.clone(),
         }
-    }
-
-    pub fn refresh(&self) {
-        let db = self.database.read().unwrap();
-        for i in 0..self.store.n_items() {
-            let item = self.store.item(i).and_downcast::<PlaylistItem>().unwrap();
-            item.set_data(&db);
-        }
-    }
-
-    pub fn clear(&self) {
-        self.store.remove_all();
     }
 
     pub fn connect_activate<F: Fn(u32) + 'static>(&self, f: F) {
@@ -110,24 +81,20 @@ impl Ui {
         self.widget.model().unwrap().unselect_all();
 
         for track in tracks {
-            self.store.append(&PlaylistItem::new(track, &db));
+            self.playlist.append(&PlaylistItem::new(track, &db));
             self.widget
                 .model()
                 .unwrap()
-                .select_item(self.store.n_items() - 1, false);
+                .select_item(self.playlist.len() - 1, false);
         }
-        if self.store.n_items() > 0 {
+        if self.playlist.len() > 0 {
             self.widget
-                .scroll_to(self.store.n_items() - 1, None, ListScrollFlags::FOCUS, None);
+                .scroll_to(self.playlist.len() - 1, None, ListScrollFlags::FOCUS, None);
         }
     }
 
     pub fn widget(&self) -> Widget {
         self.widget.clone().upcast()
-    }
-
-    pub fn store(&self) -> &gio::ListStore {
-        &self.store
     }
 }
 
@@ -224,7 +191,7 @@ fn on_drop(
     value: &Value,
     x: f64,
     y: f64,
-    store: &gio::ListStore,
+    store: &Playlist,
     database: &DatabasePtr,
 ) -> bool {
     let column_view = target.widget().unwrap().downcast::<ColumnView>().unwrap();
@@ -240,10 +207,10 @@ fn on_drop(
         let db = database.read().unwrap();
         for track in tracks {
             store.append(&PlaylistItem::new(track, &db));
-            sm.select_item(store.n_items() - 1, false);
+            sm.select_item(store.len() - 1, false);
         }
-        if store.n_items() > 0 {
-            column_view.scroll_to(store.n_items() - 1, None, ListScrollFlags::FOCUS, None);
+        if store.len() > 0 {
+            column_view.scroll_to(store.len() - 1, None, ListScrollFlags::FOCUS, None);
         }
     } else if closest.type_().name() == "GtkColumnViewRowWidget" {
         let Some(index) = find_index(store, &closest) else {
@@ -354,7 +321,7 @@ fn is_in_top_half(y: f64, row: &Widget) -> bool {
     (new_point.y() as i32) < row.height() / 2
 }
 
-fn find_index(store: &gio::ListStore, row: &Widget) -> Option<u32> {
+fn find_index(store: &Playlist, row: &Widget) -> Option<u32> {
     let entry_uuid = row
         .first_child()?
         .first_child()?
@@ -362,10 +329,10 @@ fn find_index(store: &gio::ListStore, row: &Widget) -> Option<u32> {
         .ok()?
         .playlist();
 
-    store.find_with_equal_func(|o| o.downcast_ref::<PlaylistItem>().unwrap().uuid() == entry_uuid)
+    store.find_uuid(entry_uuid)
 }
 
-fn on_delete(widget: &Widget, _args: Option<&Variant>, store: &gio::ListStore) -> Propagation {
+fn on_delete(widget: &Widget, _args: Option<&Variant>, store: &Playlist) -> Propagation {
     let widget = widget.downcast_ref::<ColumnView>().unwrap();
     let sm = widget.model().unwrap();
 
@@ -386,7 +353,7 @@ fn prepare_drag(
     source: &DragSource,
     x: f64,
     y: f64,
-    store: &gio::ListStore,
+    store: &Playlist,
 ) -> Option<gdk::ContentProvider> {
     let widget = source.widget().and_downcast::<ColumnView>().unwrap();
     let sm = widget.model().unwrap();
@@ -413,7 +380,7 @@ fn prepare_drag(
     Some(content)
 }
 
-fn drag_end(source: &DragSource, drag: &Drag, remove: bool, store: &gio::ListStore) {
+fn drag_end(source: &DragSource, drag: &Drag, remove: bool, store: &Playlist) {
     if !remove {
         return;
     }
@@ -433,26 +400,6 @@ fn drag_end(source: &DragSource, drag: &Drag, remove: bool, store: &gio::ListSto
 
         if let Some(last) = last {
             column_view.scroll_to(last as u32, None, ListScrollFlags::FOCUS, None);
-        }
-    }
-}
-
-fn save_playlist(store: &gio::ListStore, config: &ConfigPtr) {
-    let config = config.read().unwrap();
-
-    fs::create_dir_all(config.playlists_path().parent().unwrap()).unwrap();
-    match fs::File::create(config.playlists_path()) {
-        Err(e) => {
-            println!("Error creating playlist file: {}", e);
-        }
-        Ok(file) => {
-            let playlist: Vec<TrackId> = store
-                .iter::<PlaylistItem>()
-                .filter_map(|i| i.ok())
-                .map(|p| p.stored_track())
-                .collect();
-
-            serde_json::to_writer(file, &playlist).unwrap();
         }
     }
 }

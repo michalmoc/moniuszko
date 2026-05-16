@@ -14,12 +14,14 @@ use crate::database::{Database, DatabasePtr, Scanner, ScannerPtr, SearchResult, 
 use crate::media_library::{GroupingMode, GroupingModePtr};
 use crate::mpris::mpris;
 use crate::player::PlaybackState;
+use crate::playlist::Playlist;
 use adw::glib::Propagation;
 use adw::prelude::{
     AdwDialogExt, EntryRowExt, PreferencesDialogExt, PreferencesGroupExt, PreferencesPageExt,
     PreferencesRowExt,
 };
 use adw::{ButtonRow, EntryRow, PreferencesGroup, PreferencesPage};
+use async_channel::Sender;
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
@@ -106,11 +108,12 @@ fn build_ui(
         .maximized(config.read().unwrap().window_maximized)
         .build();
 
-    let playlist = playlist::Ui::new(database, config);
+    let playlist = Playlist::load_or_new(database, config.clone());
+    let playlist_ui = playlist::Ui::new(database, playlist.clone());
     let playlist_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .min_content_width(120)
-        .child(&playlist.widget())
+        .child(&playlist_ui.widget())
         .vexpand(true)
         .hexpand(true)
         .build();
@@ -127,7 +130,7 @@ fn build_ui(
     let player = player::new(&playback_state, sender.clone());
 
     let sender_clone = sender.clone();
-    playlist.connect_activate(move |p| sender_clone.send_blocking(Command::Play(p)).unwrap());
+    playlist_ui.connect_activate(move |p| sender_clone.send_blocking(Command::Play(p)).unwrap());
 
     let box_ = gtk4::Box::new(Orientation::Vertical, 0);
     box_.append(&playlist_sw);
@@ -143,7 +146,7 @@ fn build_ui(
     );
     media_library.repopulate();
     media_library.widget().set_vexpand(true);
-    let playlist_clone = playlist.clone();
+    let playlist_clone = playlist_ui.clone();
     media_library.connect_activate(move |obj| {
         playlist_clone.append(obj);
     });
@@ -160,7 +163,7 @@ fn build_ui(
     let grouping_mode_choice = DropDown::new(Some(grouping_mode_list), None::<Expression>);
     grouping_mode_choice.set_selected(1);
     grouping_mode_choice.set_hexpand(true);
-    let media_library_clone = media_library.clone();
+    let sender_clone = sender.clone();
     let grouping_mode_clone = grouping_mode.clone();
     grouping_mode_choice.connect_selected_item_notify(move |d| {
         on_grouping_mode_change(
@@ -170,7 +173,7 @@ fn build_ui(
                 .string()
                 .as_str(),
             &grouping_mode_clone,
-            &media_library_clone,
+            &sender_clone,
         )
     });
 
@@ -178,16 +181,14 @@ fn build_ui(
     let database_clone = database.clone();
     let scanner_clone = scanner.clone();
     let config_clone = config.clone();
-    let media_library_clone = media_library.clone();
-    let playlist_clone = playlist.clone();
+    let sender_clone = sender.clone();
     refresh_button.connect_clicked(move |button| {
         refresh_button_cb(
             button,
             &database_clone,
             &scanner_clone,
             &config_clone,
-            &media_library_clone,
-            &playlist_clone,
+            &sender_clone,
         )
     });
 
@@ -195,10 +196,10 @@ fn build_ui(
     library_bottom_box.append(&grouping_mode_choice);
     library_bottom_box.append(&refresh_button);
 
-    let media_library_clone = media_library.clone();
+    let sender_clone = sender.clone();
     let database_clone = database.clone();
     search.connect_search_changed(move |s| {
-        on_search_changed(s, &search_result, &database_clone, &media_library_clone)
+        on_search_changed(s, &search_result, &database_clone, &sender_clone)
     });
 
     let media_library_box = gtk4::Box::new(Orientation::Vertical, 0);
@@ -213,17 +214,15 @@ fn build_ui(
     let window_clone = window.clone().upcast();
     let config_clone = config.clone();
     let database_clone = database.clone();
-    let playlist_clone = playlist.clone();
-    let media_library_clone = media_library.clone();
     let scanner_clone = scanner.clone();
+    let sender_clone = sender.clone();
     config_button.connect_clicked(move |_| {
         on_config_clicked(
             &window_clone,
             &config_clone,
             &database_clone,
             &scanner_clone,
-            &media_library_clone,
-            &playlist_clone,
+            &sender_clone,
         )
     });
 
@@ -246,8 +245,10 @@ fn build_ui(
     glib::spawn_future_local(process_commands(
         receiver,
         window.upcast(),
-        playlist.store().clone(),
+        playlist,
         playback_state,
+        database.clone(),
+        media_library,
     ));
 }
 
@@ -256,15 +257,13 @@ fn refresh_button_cb(
     database: &DatabasePtr,
     scanner: &ScannerPtr,
     config: &ConfigPtr,
-    media_library: &media_library::Ui,
-    playlist: &playlist::Ui,
+    commands: &Sender<Command>,
 ) {
     let database_clone = database.clone();
     let scanner_clone = scanner.clone();
     let button_clone = button.clone();
     let config_clone = config.clone();
-    let media_library_clone = media_library.clone();
-    let playlist_clone = playlist.clone();
+    let commands_clone = commands.clone();
 
     glib::spawn_future_local(async move {
         button_clone.set_sensitive(false);
@@ -286,8 +285,12 @@ fn refresh_button_cb(
         .await
         .expect("Task needs to finish successfully.");
 
-        media_library_clone.repopulate();
-        playlist_clone.refresh();
+        commands_clone
+            .send_blocking(Command::RepopulateMediaLibrary)
+            .unwrap();
+        commands_clone
+            .send_blocking(Command::RefreshPlaylist)
+            .unwrap();
 
         button_clone.set_sensitive(enable_button);
     });
@@ -296,33 +299,34 @@ fn refresh_button_cb(
 fn on_grouping_mode_change(
     selected: &str,
     grouping_mode: &GroupingModePtr,
-    library: &media_library::Ui,
+    sender: &Sender<Command>,
 ) {
     grouping_mode.set(GroupingMode::from_str(selected).unwrap());
-    library.repopulate();
+    sender
+        .send_blocking(Command::RepopulateMediaLibrary)
+        .unwrap();
 }
 
 fn on_search_changed(
     searcher: &SearchEntry,
     search_result: &SearchResultPtr,
     database: &DatabasePtr,
-    library: &media_library::Ui,
+    sender: &Sender<Command>,
 ) {
     let result = database.read().unwrap().search(&searcher.text());
     search_result.replace(result);
-    library.repopulate();
+    sender
+        .send_blocking(Command::RepopulateMediaLibrary)
+        .unwrap();
 }
 
-fn clear_library(
-    database: &DatabasePtr,
-    scanner: &ScannerPtr,
-    media_library: &media_library::Ui,
-    playlist: &playlist::Ui,
-) {
+fn clear_library(database: &DatabasePtr, scanner: &ScannerPtr, sender: &Sender<Command>) {
     *database.write().unwrap() = Database::default();
     *scanner.write().unwrap() = Scanner::default();
-    media_library.repopulate();
-    playlist.clear();
+    sender
+        .send_blocking(Command::RepopulateMediaLibrary)
+        .unwrap();
+    sender.send_blocking(Command::ClearPlaylist).unwrap();
 }
 
 fn on_config_clicked(
@@ -330,8 +334,7 @@ fn on_config_clicked(
     config: &ConfigPtr,
     database: &DatabasePtr,
     scanner: &ScannerPtr,
-    media_library: &media_library::Ui,
-    playlist: &playlist::Ui,
+    sender: &Sender<Command>,
 ) {
     let media_path = EntryRow::new();
     media_path.set_title("media path");
@@ -348,16 +351,9 @@ fn on_config_clicked(
     full_rescan.set_end_icon_name(Some("view-refresh"));
     let database_clone = database.clone();
     let scanner_clone = scanner.clone();
-    let media_library_clone = media_library.clone();
-    let playlist_clone = playlist.clone();
-    full_rescan.connect_activated(move |_| {
-        clear_library(
-            &database_clone,
-            &scanner_clone,
-            &media_library_clone,
-            &playlist_clone,
-        )
-    });
+    let sender_clone = sender.clone();
+    full_rescan
+        .connect_activated(move |_| clear_library(&database_clone, &scanner_clone, &sender_clone));
 
     let group = PreferencesGroup::new();
     group.set_title("Main");
