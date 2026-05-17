@@ -11,9 +11,13 @@ pub enum Command {
     Quit,
 
     Next,
+    Pause,
     PlayPause,
-    Play(u32),
+    Stop,
+    Play,
+    PlayFromPlaylist(u32),
     Previous,
+    Seek(i64),
 
     RefreshPlaylist,
     ClearPlaylist,
@@ -43,11 +47,23 @@ pub async fn process_commands(
             Command::PlayPause => {
                 on_play_pause(&playlist, &playback_state);
             }
+            Command::Pause => {
+                on_pause(&playback_state);
+            }
+            Command::Stop => {
+                on_stop(&playback_state);
+            }
+            Command::Play => {
+                on_play(&playback_state);
+            }
             Command::Previous => {
                 on_previous(&playlist, &playback_state);
             }
-            Command::Play(pos) => {
-                on_play(&playlist, &playback_state, pos);
+            Command::Seek(pos) => {
+                on_seek(&playback_state, pos);
+            }
+            Command::PlayFromPlaylist(pos) => {
+                on_play_from_playlist(&playlist, &playback_state, pos);
             }
             Command::RefreshPlaylist => refresh_playlist(&playlist, &database),
             Command::ClearPlaylist => clear_playlist(&playlist),
@@ -56,10 +72,36 @@ pub async fn process_commands(
     }
 }
 
-pub fn on_play(playlist: &Playlist, playback_state: &PlaybackState, pos: u32) {
+pub fn on_play_from_playlist(playlist: &Playlist, playback_state: &PlaybackState, pos: u32) {
     if pos < playlist.len() {
         playback_state.set_current(playlist.get(pos));
         playback_state.set_playing(true);
+    }
+}
+
+fn on_pause(playback_state: &PlaybackState) {
+    if playback_state.current().is_some() {
+        playback_state.set_playing(false);
+    }
+}
+
+fn on_stop(playback_state: &PlaybackState) {
+    if playback_state.current().is_some() {
+        playback_state.set_playing(false);
+        playback_state.seek(0);
+    }
+}
+
+fn on_play(playback_state: &PlaybackState) {
+    if playback_state.current().is_some() {
+        playback_state.set_playing(true);
+    }
+}
+
+fn on_seek(playback_state: &PlaybackState, offset: i64) {
+    if playback_state.current().is_some() {
+        let current = playback_state.progress();
+        playback_state.seek(current + offset);
     }
 }
 

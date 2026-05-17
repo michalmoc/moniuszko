@@ -92,7 +92,6 @@ fn build_ui(
     grouping_mode: &GroupingModePtr,
 ) {
     let (sender, receiver) = async_channel::unbounded();
-    glib::spawn_future_local(mpris(sender.clone()));
 
     let config_button = Button::from_icon_name("applications-system");
 
@@ -130,7 +129,11 @@ fn build_ui(
     let player = player::new(&playback_state, sender.clone());
 
     let sender_clone = sender.clone();
-    playlist_ui.connect_activate(move |p| sender_clone.send_blocking(Command::Play(p)).unwrap());
+    playlist_ui.connect_activate(move |p| {
+        sender_clone
+            .send_blocking(Command::PlayFromPlaylist(p))
+            .unwrap()
+    });
 
     let box_ = gtk4::Box::new(Orientation::Vertical, 0);
     box_.append(&playlist_sw);
@@ -246,10 +249,12 @@ fn build_ui(
         receiver,
         window.upcast(),
         playlist,
-        playback_state,
+        playback_state.clone(),
         database.clone(),
         media_library,
     ));
+
+    glib::spawn_future_local(mpris(sender, playback_state));
 }
 
 fn refresh_button_cb(

@@ -1,12 +1,14 @@
+use crate::player::PlaybackStatus;
 use gtk4::glib;
 use gtk4::glib::Object;
 use gtk4::prelude::MediaStreamExt;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
 
 mod imp {
+    use crate::player::playback_status::PlaybackStatus;
     use crate::player::repeat_mode::RepeatMode;
     use crate::playlist::PlaylistItem;
-    use gtk4::glib::{Object, Properties};
+    use gtk4::glib::{Object, Properties, clone};
     use gtk4::prelude::ObjectExt;
     use gtk4::subclass::prelude::{DerivedObjectProperties, ObjectSubclassExt};
     use gtk4::subclass::prelude::{ObjectImpl, ObjectSubclass};
@@ -33,6 +35,9 @@ mod imp {
 
         #[property(get, set)]
         pub volume: Cell<f64>,
+
+        #[property(get, set, default)]
+        pub status: Cell<PlaybackStatus>,
 
         #[property(get, set=Self::change_current, nullable)]
         pub current: RefCell<Option<PlaylistItem>>,
@@ -64,6 +69,7 @@ mod imp {
             }
 
             self.bind_medium();
+            self.obj().compute_status();
         }
 
         fn bind_medium(&self) {
@@ -90,6 +96,12 @@ mod imp {
                     .bidirectional()
                     .sync_create()
                     .build();
+
+                obj.connect_playing_notify(clone!(
+                    #[weak]
+                    obj,
+                    move |_| obj.compute_status()
+                ));
             }
         }
     }
@@ -107,6 +119,24 @@ impl PlaybackState {
     pub fn seek(&self, progress: i64) {
         if let Some(medium) = self.imp().medium.borrow().as_ref() {
             medium.seek(progress);
+        }
+    }
+
+    fn compute_status(&self) {
+        if self.current().is_none() {
+            if self.status() != PlaybackStatus::Stopped {
+                self.set_status(PlaybackStatus::Stopped);
+            }
+        } else {
+            if self.playing() {
+                if self.status() != PlaybackStatus::Playing {
+                    self.set_status(PlaybackStatus::Playing);
+                }
+            } else {
+                if self.status() != PlaybackStatus::Paused {
+                    self.set_status(PlaybackStatus::Paused);
+                }
+            }
         }
     }
 }
