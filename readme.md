@@ -28,7 +28,7 @@ Why?
 for 1.1:
 
 - translations
-- mpris
+- album covers in mpris
 - system tray
 - enable tray in app settings
 - right-click menu on playlist and library

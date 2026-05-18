@@ -1,11 +1,18 @@
 use crate::database::{Database, TrackId};
 use gtk4::glib;
 use gtk4::glib::Object;
+use std::fmt::Display;
 use uuid::Uuid;
 
 #[derive(glib::Boxed, Copy, Clone, Eq, PartialEq, Default, Hash)]
 #[boxed_type(name = "PlaylistEntryUuid")]
 pub struct PlaylistEntryUuid(Uuid);
+
+impl Display for PlaylistEntryUuid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 mod imp {
     use crate::database::TrackId;

@@ -254,7 +254,7 @@ fn build_ui(
         media_library,
     ));
 
-    glib::spawn_future_local(mpris(sender, playback_state));
+    glib::spawn_future_local(mpris(sender, playback_state, database.clone()));
 }
 
 fn refresh_button_cb(
