@@ -9,7 +9,7 @@ mod playlist;
 
 use crate::commands::{Command, process_commands};
 use crate::config::{Config, ConfigPtr};
-use crate::constants::{APP_ID, APP_NAME};
+use crate::constants::{APP_ID, APP_NAME, FANCY_APP_NAME};
 use crate::database::{Database, DatabasePtr, Scanner, ScannerPtr, SearchResult, SearchResultPtr};
 use crate::media_library::{GroupingMode, GroupingModePtr};
 use crate::mpris::mpris;
@@ -32,16 +32,82 @@ use gtk4::{
     Button, CssProvider, DropDown, Expression, HeaderBar, Orientation, Paned, SearchEntry,
     StringList, StringObject,
 };
+use image::GenericImageView;
 use itertools::Itertools;
+use ksni::TrayMethods;
 use std::cell::{Cell, RefCell};
 use std::fs;
 use std::fs::File;
 use std::ops::Deref;
 use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, LazyLock, RwLock};
 use sys_locale::get_locale;
 
 include!(concat!(env!("OUT_DIR"), "/static_cache.rs"));
+
+#[derive(Debug)]
+struct MyTray {
+    commands: Sender<Command>,
+}
+
+impl ksni::Tray for MyTray {
+    fn id(&self) -> String {
+        APP_NAME.into()
+    }
+    fn activate(&mut self, _x: i32, _y: i32) {
+        self.commands.send_blocking(Command::HideShow).unwrap()
+    }
+
+    fn title(&self) -> String {
+        FANCY_APP_NAME.into()
+    }
+
+    fn icon_pixmap(&self) -> Vec<ksni::Icon> {
+        static ICON: LazyLock<ksni::Icon> = LazyLock::new(|| {
+            let img = image::load_from_memory_with_format(
+                include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/icon.png")),
+                image::ImageFormat::Png,
+            )
+            .expect("valid image");
+            let (width, height) = img.dimensions();
+            let mut data = img.into_rgba8().into_vec();
+            assert_eq!(data.len() % 4, 0);
+            for pixel in data.chunks_exact_mut(4) {
+                pixel.rotate_right(1) // rgba to argb
+            }
+            ksni::Icon {
+                width: width as i32,
+                height: height as i32,
+                data,
+            }
+        });
+
+        vec![ICON.clone()]
+    }
+
+    fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
+        use ksni::menu::*;
+        vec![
+            StandardItem {
+                label: t!("tray-hide-show").into(),
+                activate: Box::new(|t: &mut MyTray| {
+                    t.commands.send_blocking(Command::HideShow).unwrap()
+                }),
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
+                label: t!("tray-exit").into(),
+                icon_name: "application-exit".into(),
+                activate: Box::new(|t: &mut MyTray| {
+                    t.commands.send_blocking(Command::Quit).unwrap()
+                }),
+                ..Default::default()
+            }
+            .into(),
+        ]
+    }
+}
 
 fn main() -> glib::ExitCode {
     let requested: Vec<LanguageIdentifier> = get_locale()
@@ -131,6 +197,7 @@ fn build_ui(
         .default_width(config.read().unwrap().window_width)
         .default_height(config.read().unwrap().window_height)
         .maximized(config.read().unwrap().window_maximized)
+        .hide_on_close(true)
         .build();
 
     let playlist = Playlist::load_or_new(database, config.clone());
@@ -284,7 +351,13 @@ fn build_ui(
         media_library,
     ));
 
-    glib::spawn_future_local(mpris(sender, playback_state, database.clone()));
+    glib::spawn_future_local(mpris(sender.clone(), playback_state, database.clone()));
+
+    glib::spawn_future_local(async {
+        let tray = MyTray { commands: sender };
+        let _handle = tray.spawn().await.unwrap();
+        std::future::pending::<()>().await
+    });
 }
 
 fn refresh_button_cb(

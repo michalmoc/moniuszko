@@ -15,7 +15,7 @@ ustr = { version = "1.1.0", features = ["serde"] }
 dirs = "6.0.0"
 const_format = "0.2.35"
 anyhow = "1.0.102"
-lofty = "0.23.3"
+lofty = "0.24.0"
 rand = "0.10.1"
 itertools = "0.14.0"
 musicbrainz_rs = { version = "0.13.0", features = ["sync"] }
@@ -24,6 +24,8 @@ async-channel = "2.5.0"
 fluent-zero = "0.1.4"
 sys-locale = "0.3.2"
 fluent-langneg = "0.14.2"
+ksni = { version = "0.3.4", default-features = false, features = ["async-io"] }
+image = "0.25.10"
 
 [build-dependencies]
 fluent-zero-build = "0.1.4"

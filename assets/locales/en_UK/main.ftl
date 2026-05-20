@@ -19,3 +19,7 @@ column-title = Title
 column-artists = Artists
 column-album = Album
 column-duration = Length
+
+## TRAY
+tray-hide-show = Show/Hide
+tray-exit = Quit

@@ -4,10 +4,11 @@ use crate::player::PlaybackState;
 use crate::playlist::{Playlist, PlaylistItem};
 use adw::gtk;
 use async_channel::Receiver;
-use gtk4::prelude::GtkWindowExt;
+use gtk4::prelude::{GtkWindowExt, WidgetExt};
 
 pub enum Command {
     Raise,
+    HideShow,
     Quit,
 
     Next,
@@ -39,7 +40,11 @@ pub async fn process_commands(
                 // TODO
             }
             Command::Quit => {
+                window.set_hide_on_close(false);
                 window.close();
+            }
+            Command::HideShow => {
+                window.set_visible(!window.is_visible());
             }
             Command::Next => {
                 on_next(&playlist, &playback_state);
