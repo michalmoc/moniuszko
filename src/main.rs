@@ -22,6 +22,8 @@ use adw::prelude::{
 };
 use adw::{ButtonRow, EntryRow, PreferencesGroup, PreferencesPage};
 use async_channel::Sender;
+use fluent_langneg::{LanguageIdentifier, NegotiationStrategy, negotiate_languages};
+use fluent_zero::{set_lang, t};
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
@@ -30,14 +32,38 @@ use gtk4::{
     Button, CssProvider, DropDown, Expression, HeaderBar, Orientation, Paned, SearchEntry,
     StringList, StringObject,
 };
+use itertools::Itertools;
 use std::cell::{Cell, RefCell};
 use std::fs;
 use std::fs::File;
 use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
+use sys_locale::get_locale;
+
+include!(concat!(env!("OUT_DIR"), "/static_cache.rs"));
 
 fn main() -> glib::ExitCode {
+    let requested: Vec<LanguageIdentifier> = get_locale()
+        .and_then(|l| l.parse().ok())
+        .into_iter()
+        .collect_vec();
+
+    let available: Vec<LanguageIdentifier> =
+        LOCALES.keys().filter_map(|l| l.parse().ok()).collect_vec();
+
+    let default: LanguageIdentifier = "en-UK".parse().expect("Parsing langid failed.");
+
+    let supported = negotiate_languages(
+        &requested,
+        &available,
+        Some(&default),
+        NegotiationStrategy::Filtering,
+    );
+
+    let locale = supported[0];
+    set_lang(locale.to_string().parse().unwrap());
+
     let config = Config::load().unwrap();
 
     let mut scanner: Scanner = if let Ok(scanner_file) = File::open(config.database_path()) {
@@ -162,7 +188,11 @@ fn build_ui(
         .hexpand(false)
         .build();
 
-    let grouping_mode_list = StringList::new(GroupingMode::all_str());
+    let grouping_mode_list = StringList::new(&[]);
+    for e in GroupingMode::all_str() {
+        grouping_mode_list.append(&e);
+    }
+
     let grouping_mode_choice = DropDown::new(Some(grouping_mode_list), None::<Expression>);
     grouping_mode_choice.set_selected(1);
     grouping_mode_choice.set_hexpand(true);
@@ -342,7 +372,7 @@ fn on_config_clicked(
     sender: &Sender<Command>,
 ) {
     let media_path = EntryRow::new();
-    media_path.set_title("media path");
+    media_path.set_title(&t!("settings-media-path"));
     media_path.set_text(&config.read().unwrap().media_path.to_string_lossy());
     media_path.set_show_apply_button(true);
 
@@ -352,7 +382,7 @@ fn on_config_clicked(
     });
 
     let full_rescan = ButtonRow::new();
-    full_rescan.set_title("clear database");
+    full_rescan.set_title(&t!("settings-clear-database"));
     full_rescan.set_end_icon_name(Some("view-refresh"));
     let database_clone = database.clone();
     let scanner_clone = scanner.clone();
@@ -361,7 +391,7 @@ fn on_config_clicked(
         .connect_activated(move |_| clear_library(&database_clone, &scanner_clone, &sender_clone));
 
     let group = PreferencesGroup::new();
-    group.set_title("Main");
+    group.set_title(&t!("settings-main"));
     group.add(&media_path);
     group.add(&full_rescan);
 

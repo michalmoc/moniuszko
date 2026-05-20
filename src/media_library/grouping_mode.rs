@@ -1,5 +1,8 @@
 use crate::database::ObjectId;
+use fluent_zero::t;
+use std::borrow::Cow;
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq, Debug)]
@@ -38,29 +41,30 @@ pub enum GroupingMode {
 
 impl GroupingMode {
     pub fn from_str(input: &str) -> Option<GroupingMode> {
-        match input {
-            "None" => Some(GroupingMode::None),
-            "Album" => Some(GroupingMode::Album),
-            "Artist / Album" => Some(GroupingMode::ArtistAlbum),
-            "Artist / Year / Album" => Some(GroupingMode::ArtistYearAlbum),
-            "Genre / Album" => Some(GroupingMode::GenreAlbum),
-            "Genre / Year / Album" => Some(GroupingMode::GenreYearAlbum),
-            "Genre / Artist / Album" => Some(GroupingMode::GenreArtistAlbum),
-            "Year / Album" => Some(GroupingMode::YearAlbum),
-            _ => None,
-        }
+        HashMap::from([
+            (t!("none"), GroupingMode::None),
+            (t!("album"), GroupingMode::Album),
+            (t!("artist-album"), GroupingMode::ArtistAlbum),
+            (t!("artist-year-album"), GroupingMode::ArtistYearAlbum),
+            (t!("genre-album"), GroupingMode::GenreAlbum),
+            (t!("genre-year-album"), GroupingMode::GenreYearAlbum),
+            (t!("genre-artist-album"), GroupingMode::GenreArtistAlbum),
+            (t!("year-album"), GroupingMode::YearAlbum),
+        ])
+        .get(input)
+        .copied()
     }
 
-    pub fn all_str() -> &'static [&'static str] {
-        &[
-            "None",
-            "Album",
-            "Artist / Album",
-            "Artist / Year / Album",
-            "Genre / Album",
-            "Genre / Year / Album",
-            "Genre / Artist / Album",
-            "Year / Album",
+    pub fn all_str() -> [Cow<'static, str>; 8] {
+        [
+            t!("none"),
+            t!("album"),
+            t!("artist-album"),
+            t!("artist-year-album"),
+            t!("genre-album"),
+            t!("genre-year-album"),
+            t!("genre-artist-album"),
+            t!("year-album"),
         ]
     }
 

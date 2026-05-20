@@ -27,7 +27,6 @@ Why?
 
 for 1.1:
 
-- translations
 - album covers in mpris
 - system tray
 - enable tray in app settings

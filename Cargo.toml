@@ -21,3 +21,9 @@ itertools = "0.14.0"
 musicbrainz_rs = { version = "0.13.0", features = ["sync"] }
 zbus = "5.15.0"
 async-channel = "2.5.0"
+fluent-zero = "0.1.4"
+sys-locale = "0.3.2"
+fluent-langneg = "0.14.2"
+
+[build-dependencies]
+fluent-zero-build = "0.1.4"

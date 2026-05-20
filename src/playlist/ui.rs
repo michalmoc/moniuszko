@@ -2,6 +2,7 @@ use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
 use crate::playlist::box_with_playlist_entry::BoxWithPlaylistEntry;
 use crate::playlist::ui_item::PlaylistItem;
 use crate::playlist::{ObjectIds, Playlist};
+use fluent_zero::t;
 use gio::prelude::ListModelExt;
 use gtk4::gdk::{Drag, DragAction, Key, ModifierType};
 use gtk4::glib::{Object, Propagation, Value, Variant};
@@ -57,11 +58,11 @@ impl Ui {
         view.add_controller(drop_target);
         view.add_controller(shortcut_controller);
 
-        view.append_column(&Column::new_numeric("#", "position").build());
-        view.append_column(&Column::new_text("title", "name").build());
-        view.append_column(&Column::new_text("artists", "artists").build());
-        view.append_column(&Column::new_text("album", "album").build());
-        view.append_column(&Column::new_numeric("duration", "duration").build());
+        view.append_column(&Column::new_numeric("column-track", "position").build());
+        view.append_column(&Column::new_text("column-title", "name").build());
+        view.append_column(&Column::new_text("column-artists", "artists").build());
+        view.append_column(&Column::new_text("column-album", "album").build());
+        view.append_column(&Column::new_numeric("column-duration", "duration").build());
 
         Self {
             playlist,
@@ -130,7 +131,7 @@ impl Column {
         factory.connect_setup(move |_, item| Self::setup(item, self.align, &self.class));
         factory.connect_bind(move |_, item| Self::bind(item, &self.property));
 
-        let column = ColumnViewColumn::new(Some(&self.title), Some(factory));
+        let column = ColumnViewColumn::new(Some(&t!(&self.title)), Some(factory));
         column.set_resizable(true);
 
         column
