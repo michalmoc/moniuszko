@@ -14,6 +14,9 @@ pub struct Config {
     pub window_maximized: bool,
 
     pub media_path: PathBuf,
+
+    pub tray_enabled: bool,
+    pub hide_on_close: bool,
 }
 
 impl Default for Config {
@@ -23,6 +26,8 @@ impl Default for Config {
             window_height: 480,
             window_maximized: false,
             media_path: audio_dir().unwrap(),
+            tray_enabled: false,
+            hide_on_close: false,
         }
     }
 }

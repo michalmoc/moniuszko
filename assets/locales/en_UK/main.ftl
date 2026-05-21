@@ -1,7 +1,13 @@
 ## SETTINGS
+settings-requires-restart = requires restart
+
 settings-main = Main
 settings-media-path = Media path
 settings-clear-database = Clear database
+
+settings-tray = Tray
+settings-enable-tray = Show in system tray
+settings-hide-on-close = Hide instead of close
 
 ## GROUPING MODES
 none = ungrouped

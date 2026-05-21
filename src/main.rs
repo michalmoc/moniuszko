@@ -17,10 +17,10 @@ use crate::player::PlaybackState;
 use crate::playlist::Playlist;
 use adw::glib::Propagation;
 use adw::prelude::{
-    AdwDialogExt, EntryRowExt, PreferencesDialogExt, PreferencesGroupExt, PreferencesPageExt,
-    PreferencesRowExt,
+    ActionRowExt, AdwDialogExt, EntryRowExt, PreferencesDialogExt, PreferencesGroupExt,
+    PreferencesPageExt, PreferencesRowExt,
 };
-use adw::{ButtonRow, EntryRow, PreferencesGroup, PreferencesPage};
+use adw::{ButtonRow, EntryRow, PreferencesGroup, PreferencesPage, SwitchRow};
 use async_channel::Sender;
 use fluent_langneg::{LanguageIdentifier, NegotiationStrategy, negotiate_languages};
 use fluent_zero::{set_lang, t};
@@ -28,6 +28,7 @@ use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
 use gtk4::gdk::Display;
+use gtk4::glib::clone;
 use gtk4::{
     Button, CssProvider, DropDown, Expression, HeaderBar, Orientation, Paned, SearchEntry,
     StringList, StringObject,
@@ -197,7 +198,7 @@ fn build_ui(
         .default_width(config.read().unwrap().window_width)
         .default_height(config.read().unwrap().window_height)
         .maximized(config.read().unwrap().window_maximized)
-        .hide_on_close(true)
+        .hide_on_close(config.read().unwrap().hide_on_close)
         .build();
 
     let playlist = Playlist::load_or_new(database, config.clone());
@@ -353,11 +354,13 @@ fn build_ui(
 
     glib::spawn_future_local(mpris(sender.clone(), playback_state, database.clone()));
 
-    glib::spawn_future_local(async {
-        let tray = MyTray { commands: sender };
-        let _handle = tray.spawn().await.unwrap();
-        std::future::pending::<()>().await
-    });
+    if config.read().unwrap().tray_enabled {
+        glib::spawn_future_local(async {
+            let tray = MyTray { commands: sender };
+            let _handle = tray.spawn().await.unwrap();
+            std::future::pending::<()>().await
+        });
+    }
 }
 
 fn refresh_button_cb(
@@ -444,9 +447,11 @@ fn on_config_clicked(
     scanner: &ScannerPtr,
     sender: &Sender<Command>,
 ) {
+    let cfg = config.read().unwrap();
+
     let media_path = EntryRow::new();
     media_path.set_title(&t!("settings-media-path"));
-    media_path.set_text(&config.read().unwrap().media_path.to_string_lossy());
+    media_path.set_text(&cfg.media_path.to_string_lossy());
     media_path.set_show_apply_button(true);
 
     let config_clone = config.clone();
@@ -463,13 +468,58 @@ fn on_config_clicked(
     full_rescan
         .connect_activated(move |_| clear_library(&database_clone, &scanner_clone, &sender_clone));
 
-    let group = PreferencesGroup::new();
-    group.set_title(&t!("settings-main"));
-    group.add(&media_path);
-    group.add(&full_rescan);
+    let main_group = PreferencesGroup::new();
+    main_group.set_title(&t!("settings-main"));
+    main_group.add(&media_path);
+    main_group.add(&full_rescan);
+
+    let enable_tray = SwitchRow::new();
+    enable_tray.set_title(&t!("settings-enable-tray"));
+    enable_tray.set_subtitle(&t!("settings-requires-restart"));
+    enable_tray.set_active(cfg.tray_enabled);
+
+    let hide_on_close = SwitchRow::new();
+    hide_on_close.set_title(&t!("settings-hide-on-close"));
+    hide_on_close.set_active(cfg.hide_on_close);
+    hide_on_close.set_sensitive(cfg.tray_enabled);
+
+    enable_tray.connect_active_notify(clone!(
+        #[weak]
+        hide_on_close,
+        #[weak]
+        config,
+        move |this| {
+            if this.is_active() {
+                hide_on_close.set_sensitive(true);
+                config.write().unwrap().tray_enabled = true;
+            } else {
+                hide_on_close.set_sensitive(false);
+                hide_on_close.set_active(false);
+                config.write().unwrap().tray_enabled = false;
+            }
+        }
+    ));
+
+    hide_on_close.connect_active_notify(clone!(
+        #[weak]
+        config,
+        #[weak]
+        window,
+        move |this| {
+            let mut cfg = config.write().unwrap();
+            cfg.hide_on_close = this.is_active();
+            window.set_hide_on_close(this.is_active());
+        }
+    ));
+
+    let tray_group = PreferencesGroup::new();
+    tray_group.set_title(&t!("settings-tray"));
+    tray_group.add(&enable_tray);
+    tray_group.add(&hide_on_close);
 
     let page = PreferencesPage::new();
-    page.add(&group);
+    page.add(&main_group);
+    page.add(&tray_group);
 
     let dialog = adw::PreferencesDialog::new();
     dialog.add(&page);

@@ -1,7 +1,13 @@
 ## SETTINGS
+settings-requires-restart = wymaga ponownego uruchomienia
+
 settings-main = Główne
 settings-media-path = Ścieżka mediów
 settings-clear-database = Wyczyść bazę danych
+
+settings-tray = Tray
+settings-enable-tray = Pokaż w zasobniku systemowym
+settings-hide-on-close = Ukryj zamiast zamykać
 
 ## GROUPING MODES
 none = Bez grupowania

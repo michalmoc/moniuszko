@@ -28,7 +28,6 @@ Why?
 for 1.1:
 
 - album covers in mpris
-- enable tray in app settings
 - right-click menu on playlist and library
 
 for 1.2:
