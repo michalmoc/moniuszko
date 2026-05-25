@@ -6,12 +6,13 @@ use ustr::Ustr;
 
 mod imp {
     use crate::database::ObjectId;
+    use gtk4::glib;
     use gtk4::glib::{Object, Properties};
     use gtk4::prelude::ObjectExt;
     use gtk4::subclass::prelude::DerivedObjectProperties;
     use gtk4::subclass::prelude::{ObjectImpl, ObjectSubclass};
-    use gtk4::{gdk, glib};
     use std::cell::{Cell, RefCell};
+    use std::path::PathBuf;
 
     #[derive(Default, Properties)]
     #[properties(wrapper_type = super::MediaListItem)]
@@ -25,7 +26,7 @@ mod imp {
         pub name: RefCell<String>,
 
         #[property(get, set, nullable)]
-        pub image: RefCell<Option<gdk::Texture>>,
+        pub image: RefCell<Option<PathBuf>>,
     }
 
     #[glib::object_subclass]
@@ -66,6 +67,7 @@ impl MediaListItem {
         let obj: MediaListItem = Object::builder()
             .property("stored_object", ObjectId::from(album_id))
             .property("name", name)
+            .property("image", &database[album_id].cover)
             .build();
 
         obj.imp().filters.replace(filters);

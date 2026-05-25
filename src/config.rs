@@ -49,6 +49,10 @@ impl Config {
         Self::base_config_path().join("playlists.json")
     }
 
+    pub fn covers_path(&self) -> PathBuf {
+        Self::base_config_path().join("covers")
+    }
+
     pub fn load() -> anyhow::Result<Config> {
         if let Ok(file) = File::open(Self::config_path()) {
             Ok(serde_json::from_reader(file)?)

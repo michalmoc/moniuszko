@@ -1,17 +1,32 @@
+use crate::config::Config;
 use crate::database::musicbrainz::MusicBrainz;
 use crate::database::traverse_files::FilesDatabase;
 use crate::database::{Album, AlbumId, Artist, ArtistId, Database, Genre, Track, TrackId};
+use adw::{gdk, glib};
+use anyhow::anyhow;
+use gtk4::prelude::TextureExt;
+use image::ImageFormat;
 use itertools::Itertools;
 use lofty::file::{AudioFile, TaggedFileExt};
+use lofty::picture::PictureType;
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fs::create_dir_all;
+use std::hash::Hash;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use ustr::Ustr;
 use uuid::Uuid;
+
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone)]
+pub enum AlbumIdentification {
+    None,
+    MusicBrainz { uuid: Uuid, title: Ustr, sort: Ustr },
+    Custom { title: Ustr, sort: Ustr },
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct FileData {
@@ -20,9 +35,7 @@ pub struct FileData {
     pub title: Ustr,
     pub title_sort: Ustr,
 
-    pub album_uuid: Option<Uuid>,
-    pub album: Option<Ustr>,
-    pub album_sort: Option<Ustr>,
+    pub album: AlbumIdentification,
     pub cd: Option<u32>,
     pub position: Option<u32>,
 
@@ -44,10 +57,20 @@ pub struct Scanner {
     files_database: FilesDatabase,
     music_brainz: MusicBrainz,
     files: HashMap<PathBuf, FileData>,
+    covers: HashMap<AlbumIdentification, PathBuf>,
 }
 
 impl Scanner {
-    pub fn scan(&mut self, path: &Path) {
+    fn ensure_cover(&mut self, album: &AlbumIdentification, file_path: &Path, config: &Config) {
+        if !self.covers.contains_key(album) {
+            self.covers
+                .insert(album.clone(), make_cover(album, file_path, config));
+        }
+    }
+
+    pub fn scan(&mut self, path: &Path, config: &Config) {
+        create_dir_all(config.covers_path()).unwrap();
+
         let files = self.files_database.scan(path);
         println!(
             "unchanged: {}, modified: {}, deleted: {}, new: {}",
@@ -63,19 +86,23 @@ impl Scanner {
 
         for file in files.new {
             if let Ok(track) = scan_file(&file, None) {
+                self.ensure_cover(&track.album, &file, config);
                 self.files.insert(file, track);
             }
         }
 
         for file in files.modified {
-            if let Some(track) = self.files.get_mut(&file) {
-                if let Ok(t) = scan_file(&file, Some(track.track_id)) {
-                    *track = t;
+            if let Some(track_id) = self.files.get(&file).map(|t| t.track_id) {
+                if let Ok(track) = scan_file(&file, Some(track_id)) {
+                    self.ensure_cover(&track.album, &file, config);
+                    let old = self.files.insert(file, track);
+                    debug_assert!(old.is_some());
                 } else {
                     self.files.remove(&file);
                 }
             } else {
                 if let Ok(track) = scan_file(&file, None) {
+                    self.ensure_cover(&track.album, &file, config);
                     self.files.insert(file, track);
                 }
             }
@@ -191,37 +218,32 @@ impl Scanner {
                 found_track_artists.insert(artist_id);
             }
 
-            let album = if let Some(album_id) = known_albums.get(&(data.album_uuid, data.album)) {
+            let album = if let Some(album_id) = known_albums.get(&data.album) {
                 *album_id
             } else {
                 let album_id = AlbumId::new();
-                known_albums.insert((data.album_uuid, data.album), album_id);
+                known_albums.insert(data.album.clone(), album_id);
 
-                let new_album = if let Some(title) = data.album {
-                    Album {
-                        title,
-                        title_sort: data.album_sort.unwrap_or(title),
-                        tracks: BTreeMap::new(),
-                        unordered_tracks: Vec::new(),
-                        year: data.year,
-                    }
-                } else if let Some(uuid) = data.album_uuid {
-                    let uuid = Ustr::from(uuid.to_string().as_str());
-                    Album {
-                        title: uuid,
-                        title_sort: data.album_sort.unwrap_or(uuid),
-                        tracks: BTreeMap::new(),
-                        unordered_tracks: Vec::new(),
-                        year: data.year,
-                    }
-                } else {
-                    Album {
+                let cover = self.covers.remove(&data.album).unwrap();
+
+                let new_album = match data.album {
+                    AlbumIdentification::None => Album {
                         title: Ustr::default(),
                         title_sort: Ustr::default(),
                         tracks: BTreeMap::new(),
                         unordered_tracks: Vec::new(),
                         year: None,
-                    }
+                        cover,
+                    },
+                    AlbumIdentification::MusicBrainz { title, sort, .. }
+                    | AlbumIdentification::Custom { title, sort } => Album {
+                        title,
+                        title_sort: sort,
+                        tracks: BTreeMap::new(),
+                        unordered_tracks: Vec::new(),
+                        year: data.year,
+                        cover,
+                    },
                 };
 
                 albums.insert(album_id, new_album);
@@ -296,6 +318,50 @@ impl Scanner {
     }
 }
 
+fn make_cover(album: &AlbumIdentification, some_file: &Path, config: &Config) -> PathBuf {
+    let cover_name = match album {
+        AlbumIdentification::None => {
+            "no cover".to_string()
+            // TODO: return placeholder
+        }
+        AlbumIdentification::MusicBrainz { uuid, .. } => uuid.to_string(),
+        AlbumIdentification::Custom { title, sort } => {
+            let h1 = title.precomputed_hash();
+            let h2 = sort.precomputed_hash();
+            format!("{};;;{};;;{}", h1, h2, title)
+        }
+    };
+    let cover_path = config.covers_path().join(cover_name);
+
+    let result = (|| {
+        let tagged_file = Probe::open(some_file)?.read()?;
+
+        let tag = tagged_file
+            .primary_tag()
+            .or_else(|| tagged_file.first_tag())
+            .ok_or(anyhow!("no tag found"))?;
+
+        let pic = tag
+            .get_picture_type(PictureType::CoverFront)
+            .or_else(|| tag.pictures().first())
+            .ok_or(anyhow!("no pictures found"))?;
+
+        let texture = image::load_from_memory(pic.data())?;
+
+        texture
+            .thumbnail(128, 128)
+            .save_with_format(&cover_path, ImageFormat::Png)
+            .map_err(anyhow::Error::from)
+    })();
+
+    if let Err(e) = result {
+        println!("{}", e);
+    }
+
+    // TODO if !result return placeholder
+    cover_path
+}
+
 fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
     let tagged_file = Probe::open(path)?.read()?;
 
@@ -311,9 +377,7 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
                         track_id: id.unwrap_or_else(|| TrackId::new()),
                         title: stem.to_string_lossy().into(),
                         title_sort: stem.to_string_lossy().into(),
-                        album_uuid: None,
-                        album: None,
-                        album_sort: None,
+                        album: AlbumIdentification::None,
                         cd: Default::default(),
                         position: Default::default(),
                         album_artists: Default::default(),
@@ -349,11 +413,26 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         .get_string(ItemKey::MusicBrainzReleaseId)
         .and_then(|s| Uuid::parse_str(&s).ok());
 
-    let album = tag.album().map(|s| Ustr::from(&s));
+    let album_title = tag.album().map(|s| Ustr::from(&s));
     let album_sort = tag
         .get_string(ItemKey::AlbumTitleSortOrder)
         .map(|s| Ustr::from(&s))
-        .or(album);
+        .or(album_title);
+
+    let album = if let Some(uuid) = album_uuid {
+        AlbumIdentification::MusicBrainz {
+            uuid,
+            title: album_title.unwrap_or_default(),
+            sort: album_sort.unwrap_or_default(),
+        }
+    } else if let Some(title) = album_title {
+        AlbumIdentification::Custom {
+            title,
+            sort: album_sort.unwrap(), // because .or(album_title)
+        }
+    } else {
+        AlbumIdentification::None
+    };
 
     let position = tag.track();
     let cd = tag.disk();
@@ -388,9 +467,7 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         track_id: id.unwrap_or_else(|| TrackId::new()),
         title,
         title_sort,
-        album_uuid,
         album,
-        album_sort,
         cd,
         position,
         album_artists,

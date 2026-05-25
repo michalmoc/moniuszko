@@ -382,7 +382,7 @@ fn refresh_button_cb(
         let enable_button = gio::spawn_blocking(move || {
             let config = config_clone.read().unwrap();
             let mut scanner = scanner_clone.write().unwrap();
-            scanner.scan(&config.media_path);
+            scanner.scan(&config.media_path, &config);
             let db = scanner.make_database();
 
             fs::create_dir_all(config.database_path().parent().unwrap()).unwrap();

@@ -50,7 +50,6 @@ other:
 - save library grouping mode and repeat mode
 - Unicode aware sorting
 - placeholder album image
-- keep cover images after grouping or search changes
 - search should ignore letter case
 - publish as rust crate
 - publish on AUR

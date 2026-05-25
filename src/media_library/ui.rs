@@ -1,9 +1,9 @@
-use crate::database::{AlbumId, Database, DatabasePtr, ObjectId, SearchResultPtr};
+use crate::database::{DatabasePtr, ObjectId, SearchResultPtr};
 use crate::media_library::grouping_mode::{Category, GroupingModePtr};
 use crate::media_library::ui_item::MediaListItem;
 use crate::playlist::ObjectIds;
 use gio::prelude::{ListModelExt, ObjectExt, StaticType};
-use gtk4::glib::{Object, Value, spawn_future_local};
+use gtk4::glib::{Object, Value};
 use gtk4::prelude::{
     BoxExt, Cast, CastNone, EventControllerExt, ListItemExt, SelectionModelExt, WidgetExt,
 };
@@ -11,9 +11,6 @@ use gtk4::{
     DragSource, Image, Label, ListView, MultiSelection, Orientation, PickFlags,
     SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget, gdk, gio, glib,
 };
-use lofty::picture::PictureType;
-use lofty::prelude::TaggedFileExt;
-use lofty::probe::Probe;
 
 #[derive(Clone)]
 pub struct Ui {
@@ -162,25 +159,13 @@ fn tree_bind(list_item: &Object, database: &DatabasePtr) {
         ObjectId::TrackId(_) => {
             expander.set_child(Some(&label));
         }
-        ObjectId::AlbumId(album) => {
+        ObjectId::AlbumId(_) => {
             let image = Image::new();
             image.add_css_class("large-icons");
             dataobj
-                .bind_property("image", &image, "paintable")
+                .bind_property("image", &image, "file")
                 .sync_create()
                 .build();
-
-            if dataobj.image().is_none() {
-                let database_clone = database.clone();
-                spawn_future_local(async move {
-                    let img = gio::spawn_blocking(move || {
-                        load_image(album, &database_clone.read().unwrap())
-                    })
-                    .await
-                    .unwrap();
-                    dataobj.set_image(img);
-                });
-            }
 
             let box_ = gtk4::Box::new(Orientation::Horizontal, 10);
             box_.append(&image);
@@ -358,21 +343,4 @@ fn drag_prepare(drag_source: &DragSource, x: f64, y: f64) -> Option<gdk::Content
     let value = Value::from(object_ids);
     let content = gdk::ContentProvider::for_value(&value);
     Some(content)
-}
-
-fn load_image(album: AlbumId, db: &Database) -> Option<gdk::Texture> {
-    let any_track = db.sorted_tracks_of_album(album).into_iter().next()?;
-    let path = &db[any_track].path;
-
-    let tagged_file = Probe::open(path).ok()?.read().ok()?;
-
-    let tag = tagged_file
-        .primary_tag()
-        .or_else(|| tagged_file.first_tag())?;
-
-    let pic = tag
-        .get_picture_type(PictureType::CoverFront)
-        .or_else(|| tag.pictures().first())?;
-
-    gdk::Texture::from_bytes(&glib::Bytes::from(pic.data())).ok()
 }

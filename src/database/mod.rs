@@ -107,6 +107,8 @@ pub struct Album {
     pub year: Option<u16>, // TODO: allow multiple
     unordered_tracks: Vec<TrackId>,
     tracks: BTreeMap<(u32, u32), TrackId>,
+
+    pub cover: PathBuf,
 }
 
 pub struct Artist {
