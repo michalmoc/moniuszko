@@ -37,7 +37,7 @@ pub async fn process_commands(
     loop {
         match queue.recv().await.unwrap() {
             Command::Raise => {
-                // TODO
+                window.present();
             }
             Command::Quit => {
                 window.set_hide_on_close(false);

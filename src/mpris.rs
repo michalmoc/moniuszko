@@ -36,8 +36,7 @@ impl Mpris {
 
     #[zbus(property)]
     async fn can_raise(&self) -> bool {
-        // TODO
-        false
+        true
     }
 
     #[zbus(property)]

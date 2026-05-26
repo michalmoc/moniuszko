@@ -31,19 +31,21 @@ for 1.1:
 
 for 1.2:
 
-- many playlists
-- save/load playlist
+- remove musicbrainz?
 - undo/redo playlist changes
 - random modes
+- separate library for audiobooks
 
 for 1.3:
 
+- many playlists
+- save/load playlist
 - panel with details of current piece (including lyrics)
-- separate library for audiobooks
 - save last timestamp in audiobooks
 
 other:
 
+- real placeholder album image
 - add screenshots here
 - show cd if max cd > 1 in # column
 - save library grouping mode and repeat mode
