@@ -194,7 +194,7 @@ fn build_ui(
     let window = ApplicationWindow::builder()
         .application(app)
         .titlebar(&titlebar)
-        .title(APP_NAME)
+        .title(FANCY_APP_NAME)
         .default_width(config.read().unwrap().window_width)
         .default_height(config.read().unwrap().window_height)
         .maximized(config.read().unwrap().window_maximized)

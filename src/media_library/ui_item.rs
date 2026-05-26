@@ -67,7 +67,7 @@ impl MediaListItem {
         let obj: MediaListItem = Object::builder()
             .property("stored_object", ObjectId::from(album_id))
             .property("name", name)
-            .property("image", &database[album_id].cover)
+            .property("image", &database[album_id].cover.to_string())
             .build();
 
         obj.imp().filters.replace(filters);

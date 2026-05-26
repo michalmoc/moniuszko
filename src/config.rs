@@ -53,6 +53,10 @@ impl Config {
         Self::base_config_path().join("covers")
     }
 
+    pub fn album_placeholder_path(&self) -> PathBuf {
+        self.covers_path().join("album-placeholder")
+    }
+
     pub fn load() -> anyhow::Result<Config> {
         if let Ok(file) = File::open(Self::config_path()) {
             Ok(serde_json::from_reader(file)?)

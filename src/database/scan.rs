@@ -2,10 +2,7 @@ use crate::config::Config;
 use crate::database::musicbrainz::MusicBrainz;
 use crate::database::traverse_files::FilesDatabase;
 use crate::database::{Album, AlbumId, Artist, ArtistId, Database, Genre, Track, TrackId};
-use adw::{gdk, glib};
 use anyhow::anyhow;
-use gtk4::prelude::TextureExt;
-use image::ImageFormat;
 use itertools::Itertools;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::picture::PictureType;
@@ -57,7 +54,8 @@ pub struct Scanner {
     files_database: FilesDatabase,
     music_brainz: MusicBrainz,
     files: HashMap<PathBuf, FileData>,
-    covers: HashMap<AlbumIdentification, PathBuf>,
+    #[serde(with = "scanner_serde")]
+    covers: HashMap<AlbumIdentification, Ustr>,
 }
 
 impl Scanner {
@@ -109,6 +107,7 @@ impl Scanner {
         }
     }
 
+    // TODO: remove mut
     pub fn make_database(&mut self) -> Database {
         let mut tracks = HashMap::new();
         let mut albums = HashMap::new();
@@ -224,7 +223,7 @@ impl Scanner {
                 let album_id = AlbumId::new();
                 known_albums.insert(data.album.clone(), album_id);
 
-                let cover = self.covers.remove(&data.album).unwrap();
+                let cover = self.covers[&data.album];
 
                 let new_album = match data.album {
                     AlbumIdentification::None => Album {
@@ -318,11 +317,10 @@ impl Scanner {
     }
 }
 
-fn make_cover(album: &AlbumIdentification, some_file: &Path, config: &Config) -> PathBuf {
+fn make_cover(album: &AlbumIdentification, some_file: &Path, config: &Config) -> Ustr {
     let cover_name = match album {
         AlbumIdentification::None => {
-            "no cover".to_string()
-            // TODO: return placeholder
+            return config.album_placeholder_path().to_string_lossy().into();
         }
         AlbumIdentification::MusicBrainz { uuid, .. } => uuid.to_string(),
         AlbumIdentification::Custom { title, sort } => {
@@ -331,7 +329,8 @@ fn make_cover(album: &AlbumIdentification, some_file: &Path, config: &Config) ->
             format!("{};;;{};;;{}", h1, h2, title)
         }
     };
-    let cover_path = config.covers_path().join(cover_name);
+    let mut cover_path = config.covers_path().join(cover_name);
+    cover_path.add_extension("png");
 
     let result = (|| {
         let tagged_file = Probe::open(some_file)?.read()?;
@@ -350,16 +349,15 @@ fn make_cover(album: &AlbumIdentification, some_file: &Path, config: &Config) ->
 
         texture
             .thumbnail(128, 128)
-            .save_with_format(&cover_path, ImageFormat::Png)
+            .save(&cover_path)
             .map_err(anyhow::Error::from)
     })();
 
-    if let Err(e) = result {
-        println!("{}", e);
+    if result.is_err() {
+        config.album_placeholder_path().to_string_lossy().into()
+    } else {
+        cover_path.to_string_lossy().into()
     }
-
-    // TODO if !result return placeholder
-    cover_path
 }
 
 fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
@@ -480,6 +478,24 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         year,
         genres,
     })
+}
+
+mod scanner_serde {
+    use crate::database::scan::AlbumIdentification;
+    use serde::{Deserializer, Serializer};
+    use ustr::Ustr;
+
+    type Attr = std::collections::HashMap<AlbumIdentification, Ustr>;
+
+    pub(super) fn serialize<S: Serializer>(attr: &Attr, ser: S) -> Result<S::Ok, S::Error> {
+        let attr: Vec<_> = attr.iter().collect();
+        serde::Serialize::serialize(&attr, ser)
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(des: D) -> Result<Attr, D::Error> {
+        let attr: Vec<_> = serde::Deserialize::deserialize(des)?;
+        Ok(attr.into_iter().collect())
+    }
 }
 
 pub type ScannerPtr = Arc<RwLock<Scanner>>;

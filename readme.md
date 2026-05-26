@@ -27,7 +27,6 @@ Why?
 
 for 1.1:
 
-- album covers in mpris
 - right-click menu on playlist and library
 
 for 1.2:
@@ -49,7 +48,6 @@ other:
 - show cd if max cd > 1 in # column
 - save library grouping mode and repeat mode
 - Unicode aware sorting
-- placeholder album image
 - search should ignore letter case
 - publish as rust crate
 - publish on AUR

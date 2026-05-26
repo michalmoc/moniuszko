@@ -9,7 +9,7 @@ use gtk4::prelude::{
 };
 use gtk4::{
     DragSource, Image, Label, ListView, MultiSelection, Orientation, PickFlags,
-    SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget, gdk, gio, glib,
+    SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget, gdk, gio,
 };
 
 #[derive(Clone)]
@@ -139,7 +139,7 @@ fn tree_setup(_factory: &SignalListItemFactory, list_item: &Object) {
     list_item.set_child(Some(&expander));
 }
 
-fn tree_bind(list_item: &Object, database: &DatabasePtr) {
+fn tree_bind(list_item: &Object, _database: &DatabasePtr) {
     let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
 
     let expander = list_item.child().and_downcast::<TreeExpander>().unwrap();
