@@ -13,7 +13,7 @@ use crate::constants::{APP_ID, APP_NAME, FANCY_APP_NAME};
 use crate::database::{Database, DatabasePtr, Scanner, ScannerPtr, SearchResult, SearchResultPtr};
 use crate::media_library::{GroupingMode, GroupingModePtr};
 use crate::mpris::mpris;
-use crate::player::PlaybackState;
+use crate::player::{PlaybackState, PlayerUi};
 use crate::playlist::{ObjectIds, Playlist};
 use adw::glib::Propagation;
 use adw::prelude::{
@@ -29,7 +29,7 @@ use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
 use gtk4::gdk::Display;
-use gtk4::glib::clone;
+use gtk4::glib::{clone, closure_local};
 use gtk4::{
     Button, CssProvider, DropDown, Expression, HeaderBar, MenuButton, Orientation, Paned,
     SearchEntry, StringList, StringObject,
@@ -221,7 +221,43 @@ fn build_ui(
         }
     });
 
-    let player = player::new(&playback_state, sender.clone());
+    let player = PlayerUi::new(playback_state.clone());
+
+    player.connect_closure(
+        "next-track",
+        false,
+        closure_local!(
+            #[strong]
+            sender,
+            move |_: PlayerUi| {
+                sender.send_blocking(Command::Next).unwrap();
+            }
+        ),
+    );
+
+    player.connect_closure(
+        "play-pause",
+        false,
+        closure_local!(
+            #[strong]
+            sender,
+            move |_: PlayerUi| {
+                sender.send_blocking(Command::PlayPause).unwrap();
+            }
+        ),
+    );
+
+    player.connect_closure(
+        "previous-track",
+        false,
+        closure_local!(
+            #[strong]
+            sender,
+            move |_: PlayerUi| {
+                sender.send_blocking(Command::Previous).unwrap();
+            }
+        ),
+    );
 
     let sender_clone = sender.clone();
     playlist_ui.connect_activate(move |p| {
