@@ -61,11 +61,6 @@ impl Playlist {
         self.list.n_items()
     }
 
-    pub fn find_uuid(&self, uuid: PlaylistEntryUuid) -> Option<u32> {
-        self.list
-            .find_with_equal_func(|o| o.downcast_ref::<PlaylistItem>().unwrap().uuid() == uuid)
-    }
-
     pub fn retain<F>(&self, mut f: F)
     where
         F: FnMut(&PlaylistItem) -> bool,
@@ -83,6 +78,10 @@ impl Playlist {
 
     pub fn find(&self, item: &PlaylistItem) -> Option<u32> {
         self.list.find(item)
+    }
+
+    pub fn connect_changed_listener<F: Fn(u32) + 'static>(&self, f: F) {
+        self.list.connect_items_changed(move |_, pos, _, _| f(pos));
     }
 }
 

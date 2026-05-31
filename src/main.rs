@@ -14,7 +14,7 @@ use crate::database::{Database, DatabasePtr, Scanner, ScannerPtr, SearchResult, 
 use crate::media_library::{GroupingMode, GroupingModePtr};
 use crate::mpris::mpris;
 use crate::player::PlaybackState;
-use crate::playlist::Playlist;
+use crate::playlist::{ObjectIds, Playlist};
 use adw::glib::Propagation;
 use adw::prelude::{
     ActionRowExt, AdwDialogExt, EntryRowExt, PreferencesDialogExt, PreferencesGroupExt,
@@ -203,7 +203,7 @@ fn build_ui(
         .build();
 
     let playlist = Playlist::load_or_new(database, config.clone());
-    let playlist_ui = playlist::Ui::new(database, playlist.clone(), sender.clone());
+    let playlist_ui = playlist::Ui::new(playlist.clone(), sender.clone());
     let playlist_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .min_content_width(120)
@@ -244,10 +244,16 @@ fn build_ui(
     );
     media_library.repopulate();
     media_library.widget().set_vexpand(true);
-    let playlist_clone = playlist_ui.clone();
-    media_library.connect_activate(move |obj| {
-        playlist_clone.append(obj);
-    });
+
+    media_library.connect_activate(clone!(
+        #[strong]
+        sender,
+        move |obj| {
+            sender
+                .send_blocking(Command::AppendToPlaylist(ObjectIds::single(obj)))
+                .unwrap();
+        }
+    ));
 
     let media_library_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)

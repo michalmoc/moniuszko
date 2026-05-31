@@ -27,7 +27,6 @@ Why?
 
 for 1.2:
 
-- remove musicbrainz?
 - undo/redo playlist changes
 - random modes
 - separate library for audiobooks

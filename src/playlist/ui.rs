@@ -1,5 +1,4 @@
 use crate::commands::Command;
-use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
 use crate::playlist::box_with_playlist_entry::BoxWithPlaylistEntry;
 use crate::playlist::ui_item::PlaylistItem;
 use crate::playlist::{ObjectIds, Playlist};
@@ -8,7 +7,7 @@ use async_channel::Sender;
 use fluent_zero::t;
 use gio::prelude::ListModelExt;
 use gtk4::gdk::{Drag, DragAction, Key, ModifierType};
-use gtk4::glib::{Object, Value};
+use gtk4::glib::{Object, Value, clone};
 use gtk4::graphene::Point;
 use gtk4::prelude::{
     BoxExt, Cast, CastNone, ContentProviderExtManual, DragExt, EventControllerExt, ListItemExt,
@@ -19,31 +18,33 @@ use gtk4::{
     Label, ListScrollFlags, MultiSelection, PickFlags, Shortcut, ShortcutController,
     SignalListItemFactory, Widget, gdk, gio,
 };
+use gtk4::{SelectionModel, glib};
 use std::collections::HashSet;
 
 #[derive(Clone)]
 pub struct Ui {
-    playlist: Playlist,
     widget: ColumnView,
-    database: DatabasePtr,
 }
 
 impl Ui {
-    pub fn new(database: &DatabasePtr, playlist: Playlist, commands: Sender<Command>) -> Self {
+    pub fn new(playlist: Playlist, commands: Sender<Command>) -> Self {
         let selection = MultiSelection::new(Some(playlist.inner().clone()));
 
         let drop_target = DropTarget::new(ObjectIds::static_type(), DragAction::all());
-        let playlist_clone = playlist.clone();
-        let database_clone = database.clone();
-        drop_target
-            .connect_drop(move |t, v, x, y| on_drop(t, v, x, y, &playlist_clone, &database_clone));
+        drop_target.connect_drop(clone!(
+            #[strong]
+            commands,
+            move |t, v, x, y| on_drop(t, v, x, y, &commands)
+        ));
 
         let drag_source = DragSource::new();
         drag_source.set_actions(DragAction::MOVE);
-        let playlist_clone = playlist.clone();
-        drag_source.connect_prepare(move |s, x, y| prepare_drag(s, x, y, &playlist_clone));
-        let playlist_clone = playlist.clone();
-        drag_source.connect_drag_end(move |s, d, r| drag_end(s, d, r, &playlist_clone));
+        drag_source.connect_prepare(prepare_drag);
+        drag_source.connect_drag_end(clone!(
+            #[strong]
+            commands,
+            move |_, d, r| drag_end(d, r, &commands)
+        ));
         let shortcut_controller = ShortcutController::new();
 
         let view = ColumnView::new(Some(selection));
@@ -68,34 +69,17 @@ impl Ui {
         view.append_column(&Column::new_text("column-album", "album").build());
         view.append_column(&Column::new_numeric("column-duration", "duration").build());
 
-        Self {
-            playlist,
-            widget: view,
-            database: database.clone(),
-        }
+        playlist.connect_changed_listener(clone!(
+            #[weak]
+            view,
+            move |pos| view.scroll_to(pos, None, ListScrollFlags::FOCUS, None)
+        ));
+
+        Self { widget: view }
     }
 
     pub fn connect_activate<F: Fn(u32) + 'static>(&self, f: F) {
         self.widget.connect_activate(move |_, p| f(p));
-    }
-
-    pub fn append(&self, object_id: ObjectId) {
-        let db = self.database.read().unwrap();
-
-        let tracks = get_tracks(&db, object_id);
-        self.widget.model().unwrap().unselect_all();
-
-        for track in tracks {
-            self.playlist.append(&PlaylistItem::new(track, &db));
-            self.widget
-                .model()
-                .unwrap()
-                .select_item(self.playlist.len() - 1, false);
-        }
-        if self.playlist.len() > 0 {
-            self.widget
-                .scroll_to(self.playlist.len() - 1, None, ListScrollFlags::FOCUS, None);
-        }
     }
 
     pub fn delete_selected(&self, commands: &Sender<Command>) {
@@ -195,113 +179,37 @@ impl Column {
     }
 }
 
-fn on_drop(
-    target: &DropTarget,
-    value: &Value,
-    x: f64,
-    y: f64,
-    store: &Playlist,
-    database: &DatabasePtr,
-) -> bool {
+fn on_drop(target: &DropTarget, value: &Value, x: f64, y: f64, commands: &Sender<Command>) -> bool {
     let column_view = target.widget().unwrap().downcast::<ColumnView>().unwrap();
     column_view.grab_focus();
 
     let closest = find_closest(x, y, column_view.upcast_ref());
-    let tracks = get_dropped_tracks(value, database);
+    let obj_ids = value.get::<ObjectIds>().unwrap();
     let sm = column_view.model().unwrap();
 
     if closest == column_view {
-        sm.unselect_all();
-
-        let db = database.read().unwrap();
-        for track in tracks {
-            store.append(&PlaylistItem::new(track, &db));
-            sm.select_item(store.len() - 1, false);
-        }
-        if store.len() > 0 {
-            column_view.scroll_to(store.len() - 1, None, ListScrollFlags::FOCUS, None);
-        }
+        commands
+            .send_blocking(Command::AppendToPlaylist(obj_ids))
+            .unwrap();
     } else if closest.type_().name() == "GtkColumnViewRowWidget" {
-        let Some(index) = find_index(store, &closest) else {
+        let Some(index) = find_index(&sm, &closest) else {
             return false;
         };
 
         if is_in_top_half(y, &closest) {
-            sm.unselect_all();
-
-            let mut last = 0;
-            let db = database.read().unwrap();
-            for track in tracks.iter().rev() {
-                store.insert(index, &PlaylistItem::new(*track, &db));
-                sm.select_item(index, false);
-                last = index;
-            }
-
-            column_view.scroll_to(last, None, ListScrollFlags::FOCUS, None);
+            commands
+                .send_blocking(Command::InsertInPlaylist(obj_ids, index))
+                .unwrap();
         } else {
-            sm.unselect_all();
-
-            let mut last = 0;
-            let db = database.read().unwrap();
-            for track in tracks.iter().rev() {
-                store.insert(index + 1, &PlaylistItem::new(*track, &db));
-                sm.select_item(index + 1, false);
-                last = index + 1;
-            }
-
-            column_view.scroll_to(last, None, ListScrollFlags::FOCUS, None);
+            commands
+                .send_blocking(Command::InsertInPlaylist(obj_ids, index + 1))
+                .unwrap();
         }
     } else {
         println!("unknown type {}", closest.type_())
     }
 
     true
-}
-
-fn get_dropped_tracks(value: &Value, database: &DatabasePtr) -> Vec<TrackId> {
-    let dropped = value.get::<ObjectIds>().unwrap();
-    let mut tracks = Vec::new();
-    let database = database.read().unwrap();
-
-    for item in dropped {
-        tracks.extend(get_tracks(&database, item));
-    }
-
-    tracks
-}
-
-fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
-    // TODO: move resolving to drag
-    match item {
-        ObjectId::None => {
-            vec![]
-        }
-        ObjectId::TrackId(track_id) => {
-            vec![track_id]
-        }
-        ObjectId::AlbumId(album_id) => database.sorted_tracks_of_album(album_id),
-        ObjectId::ArtistId(artist) => {
-            let albums = database.sorted_albums_of_artist(artist);
-            albums
-                .into_iter()
-                .flat_map(|a| database.sorted_tracks_of_album(a))
-                .collect()
-        }
-        ObjectId::Genre(genre) => {
-            let albums = database.sorted_albums_of_genre(genre);
-            albums
-                .into_iter()
-                .flat_map(|a| database.sorted_tracks_of_album(a))
-                .collect()
-        }
-        ObjectId::Year(year) => {
-            let albums = database.sorted_albums_of_year(year);
-            albums
-                .into_iter()
-                .flat_map(|a| database.sorted_tracks_of_album(a))
-                .collect()
-        }
-    }
 }
 
 fn find_closest(x: f64, y: f64, column_view: &Widget) -> Widget {
@@ -330,7 +238,7 @@ fn is_in_top_half(y: f64, row: &Widget) -> bool {
     (new_point.y() as i32) < row.height() / 2
 }
 
-fn find_index(store: &Playlist, row: &Widget) -> Option<u32> {
+fn find_index(store: &SelectionModel, row: &Widget) -> Option<u32> {
     let entry_uuid = row
         .first_child()?
         .first_child()?
@@ -338,20 +246,22 @@ fn find_index(store: &Playlist, row: &Widget) -> Option<u32> {
         .ok()?
         .playlist();
 
-    store.find_uuid(entry_uuid)
+    for i in 0..store.n_items() {
+        let item = store.item(i).unwrap().downcast::<PlaylistItem>().unwrap();
+        if item.uuid() == entry_uuid {
+            return Some(i);
+        }
+    }
+
+    None
 }
 
-fn prepare_drag(
-    source: &DragSource,
-    x: f64,
-    y: f64,
-    store: &Playlist,
-) -> Option<gdk::ContentProvider> {
+fn prepare_drag(source: &DragSource, x: f64, y: f64) -> Option<gdk::ContentProvider> {
     let widget = source.widget().and_downcast::<ColumnView>().unwrap();
     let sm = widget.model().unwrap();
 
     let closest = find_closest(x, y, &source.widget().unwrap());
-    if let Some(index) = find_index(store, &closest) {
+    if let Some(index) = find_index(&sm, &closest) {
         if !sm.is_selected(index) {
             sm.select_item(index, true);
         }
@@ -372,27 +282,18 @@ fn prepare_drag(
     Some(content)
 }
 
-fn drag_end(source: &DragSource, drag: &Drag, remove: bool, store: &Playlist) {
+fn drag_end(drag: &Drag, remove: bool, commands: &Sender<Command>) {
     if !remove {
         return;
     }
 
     if let Ok(content) = drag.content().value(ObjectIds::static_type()) {
-        let content = content.get::<ObjectIds>().unwrap();
+        let content = content.get_owned::<ObjectIds>().unwrap();
         let to_remove = content.entries_to_remove();
 
-        store.retain(|e| !to_remove.contains(&e.downcast_ref::<PlaylistItem>().unwrap().uuid()));
-
-        let column_view = source.widget().and_downcast::<ColumnView>().unwrap();
-        let sm = column_view.model().unwrap();
-
-        let last = (0..sm.n_items())
-            .map(|i| sm.is_selected(i))
-            .rposition(|i| i);
-
-        if let Some(last) = last {
-            column_view.scroll_to(last as u32, None, ListScrollFlags::FOCUS, None);
-        }
+        commands
+            .send_blocking(Command::RemoveFromPlaylist(to_remove))
+            .unwrap();
     }
 }
 
@@ -408,6 +309,6 @@ pub fn on_delete_selected(widget: &ColumnView, commands: &Sender<Command>) {
     }
 
     commands
-        .send_blocking(Command::RemoveSelectedFromPlaylist(to_remove))
+        .send_blocking(Command::RemoveFromPlaylist(to_remove))
         .unwrap();
 }

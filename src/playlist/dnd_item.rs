@@ -13,12 +13,16 @@ impl ObjectIds {
         ObjectIds::default()
     }
 
+    pub fn single(obj: ObjectId) -> Self {
+        ObjectIds(vec![obj], HashSet::new())
+    }
+
     pub fn mark_entry_for_removal(&mut self, uuid: PlaylistEntryUuid) {
         self.1.insert(uuid);
     }
 
-    pub fn entries_to_remove(&self) -> &HashSet<PlaylistEntryUuid> {
-        &self.1
+    pub fn entries_to_remove(self) -> HashSet<PlaylistEntryUuid> {
+        self.1
     }
 }
 

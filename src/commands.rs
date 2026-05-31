@@ -1,7 +1,7 @@
-use crate::database::DatabasePtr;
+use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
 use crate::media_library;
 use crate::player::PlaybackState;
-use crate::playlist::{Playlist, PlaylistEntryUuid, PlaylistItem};
+use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuid, PlaylistItem};
 use adw::gtk;
 use async_channel::Receiver;
 use gtk4::prelude::{GtkWindowExt, WidgetExt};
@@ -23,7 +23,9 @@ pub enum Command {
 
     RefreshPlaylist,
     ClearPlaylist,
-    RemoveSelectedFromPlaylist(HashSet<PlaylistEntryUuid>),
+    RemoveFromPlaylist(HashSet<PlaylistEntryUuid>),
+    AppendToPlaylist(ObjectIds),
+    InsertInPlaylist(ObjectIds, u32),
 
     RepopulateMediaLibrary,
 }
@@ -72,10 +74,14 @@ pub async fn process_commands(
             Command::PlayFromPlaylist(pos) => {
                 on_play_from_playlist(&playlist, &playback_state, pos);
             }
-            Command::RefreshPlaylist => refresh_playlist(&playlist, &database),
+            Command::RefreshPlaylist => refresh_playlist(&playlist, &database.read().unwrap()),
             Command::ClearPlaylist => clear_playlist(&playlist),
-            Command::RemoveSelectedFromPlaylist(to_remove) => {
-                remove_selected_from_playlist(&playlist, &to_remove)
+            Command::RemoveFromPlaylist(to_remove) => remove_from_playlist(&playlist, &to_remove),
+            Command::AppendToPlaylist(obj) => {
+                append_to_playlist(&playlist, &database.read().unwrap(), obj)
+            }
+            Command::InsertInPlaylist(obj, pos) => {
+                insert_in_playlist(&playlist, &database.read().unwrap(), obj, pos)
             }
             Command::RepopulateMediaLibrary => media_library.repopulate(),
         }
@@ -163,10 +169,9 @@ fn on_previous(playlist: &Playlist, playback_state: &PlaybackState) {
     }
 }
 
-fn refresh_playlist(playlist: &Playlist, database: &DatabasePtr) {
-    let db = database.read().unwrap();
+fn refresh_playlist(playlist: &Playlist, database: &Database) {
     for item in playlist.iter() {
-        item.set_data(&db);
+        item.set_data(&database);
     }
 }
 
@@ -174,6 +179,62 @@ fn clear_playlist(playlist: &Playlist) {
     playlist.remove_all();
 }
 
-fn remove_selected_from_playlist(playlist: &Playlist, to_remove: &HashSet<PlaylistEntryUuid>) {
+fn remove_from_playlist(playlist: &Playlist, to_remove: &HashSet<PlaylistEntryUuid>) {
     playlist.retain(|item| !to_remove.contains(&item.uuid()));
+}
+
+fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
+    match item {
+        ObjectId::None => {
+            vec![]
+        }
+        ObjectId::TrackId(track_id) => {
+            vec![track_id]
+        }
+        ObjectId::AlbumId(album_id) => database.sorted_tracks_of_album(album_id),
+        ObjectId::ArtistId(artist) => {
+            let albums = database.sorted_albums_of_artist(artist);
+            albums
+                .into_iter()
+                .flat_map(|a| database.sorted_tracks_of_album(a))
+                .collect()
+        }
+        ObjectId::Genre(genre) => {
+            let albums = database.sorted_albums_of_genre(genre);
+            albums
+                .into_iter()
+                .flat_map(|a| database.sorted_tracks_of_album(a))
+                .collect()
+        }
+        ObjectId::Year(year) => {
+            let albums = database.sorted_albums_of_year(year);
+            albums
+                .into_iter()
+                .flat_map(|a| database.sorted_tracks_of_album(a))
+                .collect()
+        }
+    }
+}
+
+pub fn append_to_playlist(playlist: &Playlist, database: &Database, object_ids: ObjectIds) {
+    for item in object_ids {
+        for track in get_tracks(&database, item) {
+            playlist.append(&PlaylistItem::new(track, &database));
+        }
+    }
+}
+
+pub fn insert_in_playlist(
+    playlist: &Playlist,
+    database: &Database,
+    object_ids: ObjectIds,
+    pos: u32,
+) {
+    let tracks = object_ids
+        .into_iter()
+        .flat_map(|o| get_tracks(&database, o));
+
+    for track in tracks.rev() {
+        playlist.insert(pos, &PlaylistItem::new(track, &database));
+    }
 }
