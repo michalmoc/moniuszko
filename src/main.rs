@@ -24,7 +24,7 @@ use adw::{ButtonRow, EntryRow, PreferencesGroup, PreferencesPage, SwitchRow};
 use async_channel::Sender;
 use fluent_langneg::{LanguageIdentifier, NegotiationStrategy, negotiate_languages};
 use fluent_zero::{set_lang, t};
-use gio::{ActionEntry, Menu, SimpleActionGroup};
+use gio::{ActionEntry, Menu};
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;

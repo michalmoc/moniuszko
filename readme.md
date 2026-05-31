@@ -25,10 +25,6 @@ Why?
 
 ## Roadmap
 
-for 1.1:
-
-- right-click menu on playlist and library
-
 for 1.2:
 
 - remove musicbrainz?

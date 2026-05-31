@@ -6,10 +6,9 @@ use crate::playlist::{ObjectIds, Playlist};
 use adw::glib::Propagation;
 use async_channel::Sender;
 use fluent_zero::t;
-use gio::prelude::{ActionMapExtManual, ListModelExt};
-use gio::{ActionEntry, SimpleActionGroup};
+use gio::prelude::ListModelExt;
 use gtk4::gdk::{Drag, DragAction, Key, ModifierType};
-use gtk4::glib::{Object, Value, clone};
+use gtk4::glib::{Object, Value};
 use gtk4::graphene::Point;
 use gtk4::prelude::{
     BoxExt, Cast, CastNone, ContentProviderExtManual, DragExt, EventControllerExt, ListItemExt,
@@ -20,7 +19,6 @@ use gtk4::{
     Label, ListScrollFlags, MultiSelection, PickFlags, Shortcut, ShortcutController,
     SignalListItemFactory, Widget, gdk, gio,
 };
-use gtk4::{NamedAction, glib};
 use std::collections::HashSet;
 
 #[derive(Clone)]
