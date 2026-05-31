@@ -5,13 +5,12 @@ mod ui_item;
 
 use crate::config::ConfigPtr;
 use crate::database::{DatabasePtr, TrackId};
-use crate::playlist::ui_item::PlaylistEntryUuid;
 pub use dnd_item::ObjectIds;
 use gio::prelude::{ListModelExt, ListModelExtManual};
 use gtk4::prelude::{Cast, CastNone};
 use std::fs;
 pub use ui::Ui;
-pub use ui_item::PlaylistItem;
+pub use ui_item::{PlaylistEntryUuid, PlaylistItem};
 
 #[derive(Clone)]
 pub struct Playlist {

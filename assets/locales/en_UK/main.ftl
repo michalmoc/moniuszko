@@ -1,3 +1,12 @@
+## MENU
+menu-playlist = Playlist
+menu-clear-playlist = Clear
+menu-remove-selected-from-playlist = Remove selected
+
+menu-program = Program
+menu-config = Preferences
+menu-quit = Quit
+
 ## SETTINGS
 settings-requires-restart = requires restart
 

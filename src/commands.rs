@@ -1,10 +1,11 @@
 use crate::database::DatabasePtr;
 use crate::media_library;
 use crate::player::PlaybackState;
-use crate::playlist::{Playlist, PlaylistItem};
+use crate::playlist::{Playlist, PlaylistEntryUuid, PlaylistItem};
 use adw::gtk;
 use async_channel::Receiver;
 use gtk4::prelude::{GtkWindowExt, WidgetExt};
+use std::collections::HashSet;
 
 pub enum Command {
     Raise,
@@ -22,6 +23,7 @@ pub enum Command {
 
     RefreshPlaylist,
     ClearPlaylist,
+    RemoveSelectedFromPlaylist(HashSet<PlaylistEntryUuid>),
 
     RepopulateMediaLibrary,
 }
@@ -72,6 +74,9 @@ pub async fn process_commands(
             }
             Command::RefreshPlaylist => refresh_playlist(&playlist, &database),
             Command::ClearPlaylist => clear_playlist(&playlist),
+            Command::RemoveSelectedFromPlaylist(to_remove) => {
+                remove_selected_from_playlist(&playlist, &to_remove)
+            }
             Command::RepopulateMediaLibrary => media_library.repopulate(),
         }
     }
@@ -167,4 +172,8 @@ fn refresh_playlist(playlist: &Playlist, database: &DatabasePtr) {
 
 fn clear_playlist(playlist: &Playlist) {
     playlist.remove_all();
+}
+
+fn remove_selected_from_playlist(playlist: &Playlist, to_remove: &HashSet<PlaylistEntryUuid>) {
+    playlist.retain(|item| !to_remove.contains(&item.uuid()));
 }

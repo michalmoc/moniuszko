@@ -24,14 +24,15 @@ use adw::{ButtonRow, EntryRow, PreferencesGroup, PreferencesPage, SwitchRow};
 use async_channel::Sender;
 use fluent_langneg::{LanguageIdentifier, NegotiationStrategy, negotiate_languages};
 use fluent_zero::{set_lang, t};
+use gio::{ActionEntry, Menu, SimpleActionGroup};
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
 use gtk4::gdk::Display;
 use gtk4::glib::clone;
 use gtk4::{
-    Button, CssProvider, DropDown, Expression, HeaderBar, Orientation, Paned, SearchEntry,
-    StringList, StringObject,
+    Button, CssProvider, DropDown, Expression, HeaderBar, MenuButton, Orientation, Paned,
+    SearchEntry, StringList, StringObject,
 };
 use image::GenericImageView;
 use itertools::Itertools;
@@ -186,7 +187,7 @@ fn build_ui(
 ) {
     let (sender, receiver) = async_channel::unbounded();
 
-    let config_button = Button::from_icon_name("applications-system");
+    let config_button = make_menu_button();
 
     let titlebar = HeaderBar::new();
     titlebar.pack_start(&config_button);
@@ -202,7 +203,7 @@ fn build_ui(
         .build();
 
     let playlist = Playlist::load_or_new(database, config.clone());
-    let playlist_ui = playlist::Ui::new(database, playlist.clone());
+    let playlist_ui = playlist::Ui::new(database, playlist.clone(), sender.clone());
     let playlist_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .min_content_width(120)
@@ -312,20 +313,59 @@ fn build_ui(
     paned.set_start_child(Some(&media_library_box));
     paned.set_end_child(Some(&box_));
 
-    let window_clone = window.clone().upcast();
-    let config_clone = config.clone();
-    let database_clone = database.clone();
-    let scanner_clone = scanner.clone();
-    let sender_clone = sender.clone();
-    config_button.connect_clicked(move |_| {
-        on_config_clicked(
-            &window_clone,
-            &config_clone,
-            &database_clone,
-            &scanner_clone,
-            &sender_clone,
-        )
-    });
+    let action_delete_selected = ActionEntry::builder("current-playlist-delete-selected")
+        .activate(clone!(
+            #[strong]
+            playlist_ui,
+            #[strong]
+            sender,
+            move |_, _, _| playlist_ui.delete_selected(&sender)
+        ))
+        .build();
+
+    let action_clear_playlist = ActionEntry::builder("current-playlist-clear")
+        .activate(clone!(
+            #[strong]
+            sender,
+            move |_, _, _| {
+                sender.send_blocking(Command::ClearPlaylist).unwrap();
+            }
+        ))
+        .build();
+
+    let action_config = ActionEntry::builder("config")
+        .activate(clone!(
+            #[strong]
+            sender,
+            #[weak]
+            window,
+            #[weak]
+            config,
+            #[weak]
+            database,
+            #[weak]
+            scanner,
+            move |_, _, _| on_config_clicked(&window, &config, &database, &scanner, &sender)
+        ))
+        .build();
+
+    let action_quit = ActionEntry::builder("quit")
+        .activate(clone!(
+            #[strong]
+            sender,
+            move |_, _, _| {
+                sender.send_blocking(Command::Quit).unwrap();
+            }
+        ))
+        .build();
+
+    app.add_action_entries([
+        action_clear_playlist,
+        action_delete_selected,
+        action_config,
+        action_quit,
+    ]);
+    app.set_accels_for_action("app.quit", &["<Ctrl>Q"]);
 
     let config_clone = config.clone();
     window.connect_close_request(move |window| {
@@ -361,6 +401,30 @@ fn build_ui(
             std::future::pending::<()>().await
         });
     }
+}
+
+fn make_menu_button() -> MenuButton {
+    let menu_playlist = Menu::new();
+    menu_playlist.append(
+        Some(&t!("menu-remove-selected-from-playlist")),
+        Some("app.current-playlist-delete-selected"),
+    );
+    menu_playlist.append(
+        Some(&t!("menu-clear-playlist")),
+        Some("app.current-playlist-clear"),
+    );
+
+    let menu_program = Menu::new();
+    menu_program.append(Some(&t!("menu-config")), Some("app.config"));
+    menu_program.append(Some(&t!("menu-quit")), Some("app.quit"));
+
+    let menu_model = Menu::new();
+    menu_model.append_section(Some(&t!("menu-playlist")), &menu_playlist);
+    menu_model.append_section(Some(&t!("menu-program")), &menu_program);
+
+    let config_button = MenuButton::new();
+    config_button.set_menu_model(Some(&menu_model));
+    config_button
 }
 
 fn refresh_button_cb(
@@ -441,7 +505,7 @@ fn clear_library(database: &DatabasePtr, scanner: &ScannerPtr, sender: &Sender<C
 }
 
 fn on_config_clicked(
-    window: &gtk::Window,
+    window: &ApplicationWindow,
     config: &ConfigPtr,
     database: &DatabasePtr,
     scanner: &ScannerPtr,

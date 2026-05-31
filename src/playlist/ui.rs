@@ -1,11 +1,15 @@
+use crate::commands::Command;
 use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
 use crate::playlist::box_with_playlist_entry::BoxWithPlaylistEntry;
 use crate::playlist::ui_item::PlaylistItem;
 use crate::playlist::{ObjectIds, Playlist};
+use adw::glib::Propagation;
+use async_channel::Sender;
 use fluent_zero::t;
-use gio::prelude::ListModelExt;
+use gio::prelude::{ActionMapExtManual, ListModelExt};
+use gio::{ActionEntry, SimpleActionGroup};
 use gtk4::gdk::{Drag, DragAction, Key, ModifierType};
-use gtk4::glib::{Object, Propagation, Value, Variant};
+use gtk4::glib::{Object, Value, clone};
 use gtk4::graphene::Point;
 use gtk4::prelude::{
     BoxExt, Cast, CastNone, ContentProviderExtManual, DragExt, EventControllerExt, ListItemExt,
@@ -16,6 +20,7 @@ use gtk4::{
     Label, ListScrollFlags, MultiSelection, PickFlags, Shortcut, ShortcutController,
     SignalListItemFactory, Widget, gdk, gio,
 };
+use gtk4::{NamedAction, glib};
 use std::collections::HashSet;
 
 #[derive(Clone)]
@@ -26,7 +31,7 @@ pub struct Ui {
 }
 
 impl Ui {
-    pub fn new(database: &DatabasePtr, playlist: Playlist) -> Self {
+    pub fn new(database: &DatabasePtr, playlist: Playlist, commands: Sender<Command>) -> Self {
         let selection = MultiSelection::new(Some(playlist.inner().clone()));
 
         let drop_target = DropTarget::new(ObjectIds::static_type(), DragAction::all());
@@ -41,19 +46,20 @@ impl Ui {
         drag_source.connect_prepare(move |s, x, y| prepare_drag(s, x, y, &playlist_clone));
         let playlist_clone = playlist.clone();
         drag_source.connect_drag_end(move |s, d, r| drag_end(s, d, r, &playlist_clone));
-
         let shortcut_controller = ShortcutController::new();
-        let playlist_clone = playlist.clone();
+
+        let view = ColumnView::new(Some(selection));
+
         shortcut_controller.add_shortcut(
             Shortcut::builder()
                 .trigger(&KeyvalTrigger::new(Key::Delete, ModifierType::empty()))
-                .action(&CallbackAction::new(move |w, a| {
-                    on_delete(w, a, &playlist_clone)
+                .action(&CallbackAction::new(move |view, _| {
+                    on_delete_selected(view.downcast_ref().unwrap(), &commands);
+                    Propagation::Stop
                 }))
                 .build(),
         );
 
-        let view = ColumnView::new(Some(selection));
         view.add_controller(drag_source);
         view.add_controller(drop_target);
         view.add_controller(shortcut_controller);
@@ -92,6 +98,10 @@ impl Ui {
             self.widget
                 .scroll_to(self.playlist.len() - 1, None, ListScrollFlags::FOCUS, None);
         }
+    }
+
+    pub fn delete_selected(&self, commands: &Sender<Command>) {
+        on_delete_selected(&self.widget, commands);
     }
 
     pub fn widget(&self) -> Widget {
@@ -333,23 +343,6 @@ fn find_index(store: &Playlist, row: &Widget) -> Option<u32> {
     store.find_uuid(entry_uuid)
 }
 
-fn on_delete(widget: &Widget, _args: Option<&Variant>, store: &Playlist) -> Propagation {
-    let widget = widget.downcast_ref::<ColumnView>().unwrap();
-    let sm = widget.model().unwrap();
-
-    let mut to_remove = HashSet::new();
-    for i in 0..sm.n_items() {
-        if sm.is_selected(i) {
-            let item = sm.item(i).unwrap().downcast::<PlaylistItem>().unwrap();
-            to_remove.insert(item);
-        }
-    }
-
-    store.retain(|e| !to_remove.contains(e));
-
-    Propagation::Stop
-}
-
 fn prepare_drag(
     source: &DragSource,
     x: f64,
@@ -403,4 +396,20 @@ fn drag_end(source: &DragSource, drag: &Drag, remove: bool, store: &Playlist) {
             column_view.scroll_to(last as u32, None, ListScrollFlags::FOCUS, None);
         }
     }
+}
+
+pub fn on_delete_selected(widget: &ColumnView, commands: &Sender<Command>) {
+    let sm = widget.model().unwrap();
+
+    let mut to_remove = HashSet::new();
+    for i in 0..sm.n_items() {
+        if sm.is_selected(i) {
+            let item = sm.item(i).unwrap().downcast::<PlaylistItem>().unwrap();
+            to_remove.insert(item.uuid());
+        }
+    }
+
+    commands
+        .send_blocking(Command::RemoveSelectedFromPlaylist(to_remove))
+        .unwrap();
 }
