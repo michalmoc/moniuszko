@@ -1,12 +1,13 @@
 use crate::database::ObjectId;
-use crate::playlist::ui_item::PlaylistEntryUuid;
+use crate::playlist::ui_item::{PlaylistEntryUuid, PlaylistEntryUuids};
 use gio::glib;
-use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
+
+// TODO: move to data
 
 #[derive(Default, Clone, glib::Boxed)]
 #[boxed_type(name = "ObjectIds")]
-pub struct ObjectIds(Vec<ObjectId>, HashSet<PlaylistEntryUuid>);
+pub struct ObjectIds(Vec<ObjectId>, PlaylistEntryUuids);
 
 impl ObjectIds {
     pub fn new() -> Self {
@@ -14,14 +15,14 @@ impl ObjectIds {
     }
 
     pub fn single(obj: ObjectId) -> Self {
-        ObjectIds(vec![obj], HashSet::new())
+        ObjectIds(vec![obj], PlaylistEntryUuids::default())
     }
 
     pub fn mark_entry_for_removal(&mut self, uuid: PlaylistEntryUuid) {
         self.1.insert(uuid);
     }
 
-    pub fn entries_to_remove(self) -> HashSet<PlaylistEntryUuid> {
+    pub fn entries_to_remove(self) -> PlaylistEntryUuids {
         self.1
     }
 }

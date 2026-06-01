@@ -9,8 +9,8 @@ pub use dnd_item::ObjectIds;
 use gio::prelude::{ListModelExt, ListModelExtManual};
 use gtk4::prelude::{Cast, CastNone};
 use std::fs;
-pub use ui::Ui;
-pub use ui_item::{PlaylistEntryUuid, PlaylistItem};
+pub use ui::PlaylistUi;
+pub use ui_item::{PlaylistEntryUuid, PlaylistEntryUuids, PlaylistItem};
 
 #[derive(Clone)]
 pub struct Playlist {

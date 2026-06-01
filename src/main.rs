@@ -14,7 +14,7 @@ use crate::database::{Database, DatabasePtr, Scanner, ScannerPtr, SearchResult, 
 use crate::media_library::{GroupingMode, GroupingModePtr};
 use crate::mpris::mpris;
 use crate::player::{PlaybackState, PlayerUi};
-use crate::playlist::{ObjectIds, Playlist};
+use crate::playlist::{ObjectIds, Playlist, PlaylistUi};
 use adw::glib::Propagation;
 use adw::prelude::{
     ActionRowExt, AdwDialogExt, EntryRowExt, PreferencesDialogExt, PreferencesGroupExt,
@@ -203,11 +203,43 @@ fn build_ui(
         .build();
 
     let playlist = Playlist::load_or_new(database, config.clone());
-    let playlist_ui = playlist::Ui::new(playlist.clone(), sender.clone());
+
+    let playlist_ui = PlaylistUi::new(&playlist);
+
+    playlist_ui.connect_request_append_tracks(clone!(
+        #[strong]
+        sender,
+        move |objs| {
+            sender
+                .send_blocking(Command::AppendToPlaylist(objs))
+                .unwrap()
+        }
+    ));
+
+    playlist_ui.connect_request_insert_tracks(clone!(
+        #[strong]
+        sender,
+        move |objs, pos| {
+            sender
+                .send_blocking(Command::InsertInPlaylist(objs, pos))
+                .unwrap()
+        }
+    ));
+
+    playlist_ui.connect_request_remove_tracks(clone!(
+        #[strong]
+        sender,
+        move |uuids| {
+            sender
+                .send_blocking(Command::RemoveFromPlaylist(uuids))
+                .unwrap()
+        }
+    ));
+
     let playlist_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .min_content_width(120)
-        .child(&playlist_ui.widget())
+        .child(&playlist_ui)
         .vexpand(true)
         .hexpand(true)
         .build();
@@ -223,6 +255,7 @@ fn build_ui(
 
     let player = PlayerUi::new(playback_state.clone());
 
+    // TODO: refactor
     player.connect_closure(
         "next-track",
         false,
@@ -259,12 +292,11 @@ fn build_ui(
         ),
     );
 
-    let sender_clone = sender.clone();
-    playlist_ui.connect_activate(move |p| {
-        sender_clone
-            .send_blocking(Command::PlayFromPlaylist(p))
-            .unwrap()
-    });
+    playlist_ui.connect_activate(clone!(
+        #[strong]
+        sender,
+        move |_, p| sender.send_blocking(Command::PlayFromPlaylist(p)).unwrap()
+    ));
 
     let box_ = gtk4::Box::new(Orientation::Vertical, 0);
     box_.append(&playlist_sw);
@@ -357,11 +389,9 @@ fn build_ui(
 
     let action_delete_selected = ActionEntry::builder("current-playlist-delete-selected")
         .activate(clone!(
-            #[strong]
+            #[weak]
             playlist_ui,
-            #[strong]
-            sender,
-            move |_, _, _| playlist_ui.delete_selected(&sender)
+            move |_, _, _| playlist_ui.request_delete_selected()
         ))
         .build();
 

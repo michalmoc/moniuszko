@@ -7,6 +7,14 @@ glib::wrapper! {
         @implements gtk4::Accessible, gtk4::Buildable, gtk4::ConstraintTarget;
 }
 
+impl PlayerUi {
+    pub fn new(playback_state: PlaybackState) -> Self {
+        glib::Object::builder()
+            .property("playback_state", playback_state)
+            .build()
+    }
+}
+
 mod imp {
     use crate::player::PlaybackState;
     use adw::ToggleGroup;
@@ -77,6 +85,7 @@ mod imp {
             }
         }
 
+        // TODO: add helper methids "connect"
         fn signals() -> &'static [Signal] {
             static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
             SIGNALS.get_or_init(|| {
@@ -229,13 +238,5 @@ mod imp {
         player_control_box.append(&forward_button);
 
         player_control_box.upcast()
-    }
-}
-
-impl PlayerUi {
-    pub fn new(playback_state: PlaybackState) -> Self {
-        glib::Object::builder()
-            .property("playback_state", playback_state)
-            .build()
     }
 }

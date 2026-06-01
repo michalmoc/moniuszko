@@ -1,10 +1,11 @@
 use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
 use crate::media_library;
 use crate::player::PlaybackState;
-use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuid, PlaylistItem};
+use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuid, PlaylistEntryUuids, PlaylistItem};
 use adw::gtk;
 use async_channel::Receiver;
 use gtk4::prelude::{GtkWindowExt, WidgetExt};
+use std::borrow::Borrow;
 use std::collections::HashSet;
 
 pub enum Command {
@@ -23,7 +24,7 @@ pub enum Command {
 
     RefreshPlaylist,
     ClearPlaylist,
-    RemoveFromPlaylist(HashSet<PlaylistEntryUuid>),
+    RemoveFromPlaylist(PlaylistEntryUuids),
     AppendToPlaylist(ObjectIds),
     InsertInPlaylist(ObjectIds, u32),
 
@@ -76,7 +77,9 @@ pub async fn process_commands(
             }
             Command::RefreshPlaylist => refresh_playlist(&playlist, &database.read().unwrap()),
             Command::ClearPlaylist => clear_playlist(&playlist),
-            Command::RemoveFromPlaylist(to_remove) => remove_from_playlist(&playlist, &to_remove),
+            Command::RemoveFromPlaylist(to_remove) => {
+                remove_from_playlist(&playlist, to_remove.borrow())
+            }
             Command::AppendToPlaylist(obj) => {
                 append_to_playlist(&playlist, &database.read().unwrap(), obj)
             }
