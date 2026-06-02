@@ -1,5 +1,5 @@
 use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
-use crate::media_library;
+use crate::media_library::MediaLibraryUi;
 use crate::player::PlaybackState;
 use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuid, PlaylistEntryUuids, PlaylistItem};
 use adw::gtk;
@@ -37,7 +37,7 @@ pub async fn process_commands(
     playlist: Playlist,
     playback_state: PlaybackState,
     database: DatabasePtr,
-    media_library: media_library::Ui,
+    media_library: MediaLibraryUi,
 ) {
     loop {
         match queue.recv().await.unwrap() {

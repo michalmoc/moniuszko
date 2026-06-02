@@ -11,7 +11,7 @@ use crate::commands::{Command, process_commands};
 use crate::config::{Config, ConfigPtr};
 use crate::constants::{APP_ID, APP_NAME, FANCY_APP_NAME};
 use crate::database::{Database, DatabasePtr, Scanner, ScannerPtr, SearchResult, SearchResultPtr};
-use crate::media_library::{GroupingMode, GroupingModePtr};
+use crate::media_library::{GroupingMode, GroupingModePtr, MediaLibraryUi};
 use crate::mpris::mpris;
 use crate::player::{PlaybackState, PlayerUi};
 use crate::playlist::{ObjectIds, Playlist, PlaylistUi};
@@ -29,7 +29,7 @@ use gtk::prelude::*;
 use gtk::{ApplicationWindow, glib};
 use gtk4 as gtk;
 use gtk4::gdk::Display;
-use gtk4::glib::{clone, closure_local};
+use gtk4::glib::clone;
 use gtk4::{
     Button, CssProvider, DropDown, Expression, HeaderBar, MenuButton, Orientation, Paned,
     SearchEntry, StringList, StringObject,
@@ -255,42 +255,29 @@ fn build_ui(
 
     let player = PlayerUi::new(playback_state.clone());
 
-    // TODO: refactor
-    player.connect_closure(
-        "next-track",
-        false,
-        closure_local!(
-            #[strong]
-            sender,
-            move |_: PlayerUi| {
-                sender.send_blocking(Command::Next).unwrap();
-            }
-        ),
-    );
+    player.connect_next_track(clone!(
+        #[strong]
+        sender,
+        move || {
+            sender.send_blocking(Command::Next).unwrap();
+        }
+    ));
 
-    player.connect_closure(
-        "play-pause",
-        false,
-        closure_local!(
-            #[strong]
-            sender,
-            move |_: PlayerUi| {
-                sender.send_blocking(Command::PlayPause).unwrap();
-            }
-        ),
-    );
+    player.connect_play_pause(clone!(
+        #[strong]
+        sender,
+        move || {
+            sender.send_blocking(Command::PlayPause).unwrap();
+        }
+    ));
 
-    player.connect_closure(
-        "previous-track",
-        false,
-        closure_local!(
-            #[strong]
-            sender,
-            move |_: PlayerUi| {
-                sender.send_blocking(Command::Previous).unwrap();
-            }
-        ),
-    );
+    player.connect_previous_track(clone!(
+        #[strong]
+        sender,
+        move || {
+            sender.send_blocking(Command::Previous).unwrap();
+        }
+    ));
 
     playlist_ui.connect_activate(clone!(
         #[strong]
@@ -305,13 +292,13 @@ fn build_ui(
     let search = SearchEntry::new();
     let search_result = Rc::new(RefCell::new(SearchResult::default()));
 
-    let media_library = media_library::Ui::new(
+    let media_library = MediaLibraryUi::new(
         database.clone(),
-        grouping_mode.clone(),
         search_result.clone(),
+        grouping_mode.clone(),
     );
     media_library.repopulate();
-    media_library.widget().set_vexpand(true);
+    media_library.set_vexpand(true);
 
     media_library.connect_activate(clone!(
         #[strong]
@@ -326,7 +313,7 @@ fn build_ui(
     let media_library_sw = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
         .min_content_width(120)
-        .child(&media_library.widget())
+        .child(&media_library)
         .vexpand(true)
         .hexpand(false)
         .build();
@@ -372,11 +359,15 @@ fn build_ui(
     library_bottom_box.append(&grouping_mode_choice);
     library_bottom_box.append(&refresh_button);
 
-    let sender_clone = sender.clone();
-    let database_clone = database.clone();
-    search.connect_search_changed(move |s| {
-        on_search_changed(s, &search_result, &database_clone, &sender_clone)
-    });
+    search.connect_search_changed(clone!(
+        #[weak]
+        search_result,
+        #[weak]
+        database,
+        #[strong]
+        sender,
+        move |s| on_search_changed(s, &search_result, &database, &sender)
+    ));
 
     let media_library_box = gtk4::Box::new(Orientation::Vertical, 0);
     media_library_box.append(&search);

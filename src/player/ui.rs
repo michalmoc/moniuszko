@@ -1,4 +1,6 @@
 use crate::player::playback_state::PlaybackState;
+use adw::glib::closure_local;
+use adw::prelude::ObjectExt;
 use gtk4::{Widget, glib};
 
 glib::wrapper! {
@@ -12,6 +14,18 @@ impl PlayerUi {
         glib::Object::builder()
             .property("playback_state", playback_state)
             .build()
+    }
+
+    pub fn connect_previous_track<F: Fn() + 'static>(&self, f: F) {
+        self.connect_closure("previous-track", false, closure_local!(move |_: Self| f()));
+    }
+
+    pub fn connect_play_pause<F: Fn() + 'static>(&self, f: F) {
+        self.connect_closure("play-pause", false, closure_local!(move |_: Self| f()));
+    }
+
+    pub fn connect_next_track<F: Fn() + 'static>(&self, f: F) {
+        self.connect_closure("next-track", false, closure_local!(move |_: Self| f()));
     }
 }
 

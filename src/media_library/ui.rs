@@ -1,50 +1,197 @@
 use crate::database::{DatabasePtr, ObjectId, SearchResultPtr};
-use crate::media_library::grouping_mode::{Category, GroupingModePtr};
+use crate::media_library::GroupingModePtr;
+use crate::media_library::grouping_mode::Category;
 use crate::media_library::ui_item::MediaListItem;
-use crate::playlist::ObjectIds;
-use gio::prelude::{ListModelExt, ObjectExt, StaticType};
-use gtk4::glib::{Object, Value};
-use gtk4::prelude::{
-    BoxExt, Cast, CastNone, EventControllerExt, ListItemExt, SelectionModelExt, WidgetExt,
-};
-use gtk4::{
-    DragSource, Image, Label, ListView, MultiSelection, Orientation, PickFlags,
-    SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget, gdk, gio,
-};
+use gio::prelude::ListModelExt;
+use gtk4::glib::Object;
+use gtk4::prelude::{Cast, CastNone};
+use gtk4::subclass::prelude::ObjectSubclassIsExt;
+use gtk4::{MultiSelection, TreeListModel, TreeListRow, Widget, glib};
+use std::cell::Ref;
 
-#[derive(Clone)]
-pub struct Ui {
-    top_store: gio::ListStore,
-    tree_store: TreeListModel,
-    widget: ListView,
-    database: DatabasePtr,
-    grouping_mode: GroupingModePtr,
-    search_result: SearchResultPtr,
+glib::wrapper! {
+    pub struct MediaLibraryUi(ObjectSubclass<imp::MediaLibraryUi>)
+        @extends Widget,
+        @implements gtk4::Accessible, gtk4::Buildable, gtk4::ConstraintTarget;
 }
-
-impl Ui {
+impl MediaLibraryUi {
     pub fn new(
         database: DatabasePtr,
-        grouping_mode: GroupingModePtr,
         search_result: SearchResultPtr,
+        grouping_mode: GroupingModePtr,
     ) -> Self {
+        let obj: Self = Object::builder().build();
+
+        obj.imp().database.replace(Some(database));
+        obj.imp().search_result.replace(Some(search_result));
+        obj.imp().grouping_mode.replace(Some(grouping_mode));
+
+        obj
+    }
+
+    pub fn database(&self) -> Ref<'_, DatabasePtr> {
+        Ref::map(self.imp().database.borrow(), |r| r.as_ref().unwrap())
+    }
+
+    pub fn search_result(&self) -> Ref<'_, SearchResultPtr> {
+        Ref::map(self.imp().search_result.borrow(), |r| r.as_ref().unwrap())
+    }
+
+    pub fn grouping_mode(&self) -> Ref<'_, GroupingModePtr> {
+        Ref::map(self.imp().grouping_mode.borrow(), |r| r.as_ref().unwrap())
+    }
+
+    pub fn connect_activate<F>(&self, f: F)
+    where
+        F: Fn(ObjectId) + 'static,
+    {
+        let view_ptr = self.imp().view.borrow();
+        let view = view_ptr.as_ref().unwrap();
+
+        view.connect_activate(move |w, p| {
+            let sm = w.model().and_downcast::<MultiSelection>().unwrap();
+            let store = sm.model().unwrap();
+
+            let row = store.item(p).and_downcast::<TreeListRow>().unwrap();
+            let item = row.item().and_downcast::<MediaListItem>().unwrap();
+            f(item.stored_object());
+        });
+    }
+
+    pub fn repopulate(&self) {
+        let view_ptr = self.imp().view.borrow();
+        let view = view_ptr.as_ref().unwrap();
+        let store = view
+            .model()
+            .and_downcast::<MultiSelection>()
+            .unwrap()
+            .model()
+            .and_downcast::<TreeListModel>()
+            .unwrap()
+            .model()
+            .downcast::<gio::ListStore>()
+            .unwrap();
+
+        store.remove_all();
+
+        let database_ptr = self.database();
+        let database = database_ptr.read().unwrap();
+
+        let search_result_ptr = self.search_result();
+        let search_result = search_result_ptr.borrow();
+
+        match self.grouping_mode().get().top_category() {
+            Category::Track => {
+                for track_id in database.sorted_tracks() {
+                    if search_result.has_track(track_id) {
+                        store.append(&MediaListItem::new_track(track_id, vec![], &database));
+                    }
+                }
+            }
+            Category::Album => {
+                for album_id in database.sorted_albums() {
+                    if search_result.has_album(album_id) {
+                        store.append(&MediaListItem::new_album(album_id, vec![], &database));
+                    }
+                }
+            }
+            Category::Artist => {
+                for artist_id in database.sorted_artists() {
+                    if search_result.has_artist(artist_id) {
+                        store.append(&MediaListItem::new_artist(artist_id, vec![], &database));
+                    }
+                }
+            }
+            Category::Genre => {
+                for genre in database.sorted_genres() {
+                    if search_result.has_genre(genre) {
+                        store.append(&MediaListItem::new_genre(genre, vec![]));
+                    }
+                }
+            }
+            Category::Year => {
+                for year in database.sorted_years() {
+                    if search_result.has_year(year) {
+                        store.append(&MediaListItem::new_year(year, vec![]));
+                    }
+                }
+            }
+        }
+    }
+}
+
+mod imp {
+    use crate::database::{DatabasePtr, ObjectId, SearchResultPtr};
+    use crate::media_library::GroupingModePtr;
+    use crate::media_library::grouping_mode::Category;
+    use crate::media_library::ui_item::MediaListItem;
+    use crate::playlist::ObjectIds;
+    use adw::glib;
+    use adw::glib::Properties;
+    use adw::subclass::prelude::{ObjectImpl, ObjectImplExt, ObjectSubclass, ObjectSubclassExt};
+    use gio::prelude::ListModelExt;
+    use gtk4::glib::{Object, Value};
+    use gtk4::prelude::{
+        BoxExt, Cast, CastNone, EventControllerExt, ListItemExt, ObjectExt, SelectionModelExt,
+        StaticType, WidgetExt,
+    };
+    use gtk4::subclass::prelude::DerivedObjectProperties;
+    use gtk4::subclass::prelude::{WidgetClassExt, WidgetImpl};
+    use gtk4::{
+        DragSource, Image, Label, ListView, MultiSelection, Orientation, PickFlags,
+        SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget, gdk,
+    };
+    use std::cell::RefCell;
+
+    #[derive(Properties, Default)]
+    #[properties(wrapper_type = super::MediaLibraryUi)]
+    pub struct MediaLibraryUi {
+        pub view: RefCell<Option<ListView>>,
+
+        pub database: RefCell<Option<DatabasePtr>>,
+        pub search_result: RefCell<Option<SearchResultPtr>>,
+        pub grouping_mode: RefCell<Option<GroupingModePtr>>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for MediaLibraryUi {
+        const NAME: &'static str = "MediaLibraryUi";
+        type Type = super::MediaLibraryUi;
+        type ParentType = Widget;
+
+        fn class_init(klass: &mut Self::Class) {
+            klass.set_layout_manager_type::<gtk4::BinLayout>();
+            klass.set_css_name("media_library");
+        }
+    }
+
+    #[glib::derived_properties]
+    impl ObjectImpl for MediaLibraryUi {
+        fn constructed(&self) {
+            self.parent_constructed();
+            let obj = self.obj();
+
+            let view = new_view(obj.clone());
+            view.set_parent(&*obj);
+            self.view.replace(Some(view));
+        }
+
+        fn dispose(&self) {
+            if let Some(child) = self.view.borrow_mut().take() {
+                child.unparent();
+            }
+        }
+    }
+
+    impl WidgetImpl for MediaLibraryUi {}
+
+    fn new_view(obj: super::MediaLibraryUi) -> ListView {
         let factory = SignalListItemFactory::new();
         factory.connect_setup(tree_setup);
-        let database_clone = database.clone();
-        factory.connect_bind(move |_, i| tree_bind(i, &database_clone));
+        factory.connect_bind(move |_, i| tree_bind(i));
 
         let store = gio::ListStore::new::<MediaListItem>();
-        let database_clone = database.clone();
-        let grouping_mode_clone = grouping_mode.clone();
-        let search_result_clone = search_result.clone();
-        let model = TreeListModel::new(store.clone(), false, false, move |i| {
-            create(
-                i,
-                &database_clone,
-                &grouping_mode_clone,
-                &search_result_clone,
-            )
-        });
+        let model = TreeListModel::new(store.clone(), false, false, move |i| create(i, &obj));
 
         let selection = MultiSelection::new(Some(model.clone()));
         let drag_source = DragSource::new();
@@ -54,293 +201,206 @@ impl Ui {
         tree.add_controller(drag_source);
         tree.add_css_class("navigation-sidebar");
 
-        Self {
-            top_store: store,
-            widget: tree,
-            tree_store: model,
-            database,
-            grouping_mode,
-            search_result,
+        tree
+    }
+
+    fn tree_setup(_factory: &SignalListItemFactory, list_item: &Object) {
+        let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
+
+        let expander = TreeExpander::new();
+        list_item.set_child(Some(&expander));
+    }
+
+    fn tree_bind(list_item: &Object) {
+        let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
+
+        let expander = list_item.child().and_downcast::<TreeExpander>().unwrap();
+        let row = list_item.item().and_downcast::<TreeListRow>().unwrap();
+        expander.set_list_row(Some(&row));
+
+        let dataobj = row.item().and_downcast::<MediaListItem>().unwrap();
+
+        let label = Label::new(None);
+        dataobj
+            .bind_property("name", &label, "label")
+            .sync_create()
+            .build();
+
+        match dataobj.stored_object() {
+            ObjectId::None => {}
+            ObjectId::TrackId(_) => {
+                expander.set_child(Some(&label));
+            }
+            ObjectId::AlbumId(_) => {
+                let image = Image::new();
+                image.add_css_class("large-icons");
+                dataobj
+                    .bind_property("image", &image, "file")
+                    .sync_create()
+                    .build();
+
+                let box_ = gtk4::Box::new(Orientation::Horizontal, 10);
+                box_.append(&image);
+                box_.append(&label);
+                expander.set_child(Some(&box_));
+            }
+            ObjectId::ArtistId(_) => {
+                expander.set_child(Some(&label));
+            }
+            ObjectId::Genre(_) => {
+                expander.set_child(Some(&label));
+            }
+            ObjectId::Year(_) => {
+                label.add_css_class("numeric");
+                expander.set_child(Some(&label));
+            }
         }
     }
 
-    pub fn connect_activate<F>(&self, f: F)
-    where
-        F: Fn(ObjectId) + 'static,
-    {
-        let store = self.tree_store.clone();
-        self.widget.connect_activate(move |_, p| {
-            let row = store.item(p).and_downcast::<TreeListRow>().unwrap();
-            let item = row.item().and_downcast::<MediaListItem>().unwrap();
-            f(item.stored_object());
-        });
-    }
+    fn create(item: &Object, obj: &super::MediaLibraryUi) -> Option<gio::ListModel> {
+        let item = item.downcast_ref::<MediaListItem>().unwrap();
+        let grouping_mode = obj.grouping_mode().get();
 
-    pub fn widget(&self) -> Widget {
-        self.widget.clone().upcast()
-    }
+        let current = item.stored_object();
+        let current_category = Category::of(&current);
+        let next_category = grouping_mode.next_category(current_category);
 
-    pub fn repopulate(&self) {
-        self.top_store.remove_all();
+        let mut filters = item.filters();
+        filters.push(current);
 
-        let db = self.database.read().unwrap();
-        let search_result = self.search_result.borrow();
-        let mode = self.grouping_mode.get();
+        let store = gio::ListStore::new::<MediaListItem>();
 
-        match mode.top_category() {
-            Category::Track => {
-                for track_id in db.sorted_tracks() {
-                    if search_result.has_track(track_id) {
-                        self.top_store
-                            .append(&MediaListItem::new_track(track_id, vec![], &db));
+        let database_ptr = obj.database();
+        let database = database_ptr.read().unwrap();
+
+        let search_result_ptr = obj.search_result();
+        let search_result = search_result_ptr.borrow();
+
+        match (current, next_category) {
+            (ObjectId::None, _) => None,
+            (ObjectId::TrackId(_), _) => None,
+            (ObjectId::AlbumId(album_id), Category::Track) => {
+                for track in database.sorted_tracks_of_album(album_id) {
+                    if database.track_matches_filter(track, &filters)
+                        && search_result.has_track(track)
+                    {
+                        store.append(&MediaListItem::new_track(track, filters.clone(), &database));
                     }
                 }
+
+                Some(store.upcast())
             }
-            Category::Album => {
-                for album_id in db.sorted_albums() {
-                    if search_result.has_album(album_id) {
-                        self.top_store
-                            .append(&MediaListItem::new_album(album_id, vec![], &db));
+            (ObjectId::ArtistId(artist_id), Category::Album) => {
+                for album in database.sorted_albums_of_artist(artist_id) {
+                    if database.album_matches_filter(album, &filters)
+                        && search_result.has_album(album)
+                    {
+                        store.append(&MediaListItem::new_album(album, filters.clone(), &database));
                     }
                 }
+
+                Some(store.upcast())
             }
-            Category::Artist => {
-                for artist_id in db.sorted_artists() {
-                    if search_result.has_artist(artist_id) {
-                        self.top_store
-                            .append(&MediaListItem::new_artist(artist_id, vec![], &db));
-                    }
-                }
-            }
-            Category::Genre => {
-                for genre in db.sorted_genres() {
-                    if search_result.has_genre(genre) {
-                        self.top_store
-                            .append(&MediaListItem::new_genre(genre, vec![]));
-                    }
-                }
-            }
-            Category::Year => {
-                for year in db.sorted_years() {
+            (ObjectId::ArtistId(artist_id), Category::Year) => {
+                for year in database.sorted_years_of_artist(artist_id) {
+                    // TODO: _matches_filter
                     if search_result.has_year(year) {
-                        self.top_store
-                            .append(&MediaListItem::new_year(year, vec![]));
+                        store.append(&MediaListItem::new_year(year, filters.clone()));
                     }
                 }
+
+                Some(store.upcast())
             }
-        }
-    }
-}
-
-fn tree_setup(_factory: &SignalListItemFactory, list_item: &Object) {
-    let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
-
-    let expander = TreeExpander::new();
-    list_item.set_child(Some(&expander));
-}
-
-fn tree_bind(list_item: &Object, _database: &DatabasePtr) {
-    let list_item = list_item.downcast_ref::<gtk4::ListItem>().unwrap();
-
-    let expander = list_item.child().and_downcast::<TreeExpander>().unwrap();
-    let row = list_item.item().and_downcast::<TreeListRow>().unwrap();
-    expander.set_list_row(Some(&row));
-
-    let dataobj = row.item().and_downcast::<MediaListItem>().unwrap();
-
-    let label = Label::new(None);
-    dataobj
-        .bind_property("name", &label, "label")
-        .sync_create()
-        .build();
-
-    match dataobj.stored_object() {
-        ObjectId::None => {}
-        ObjectId::TrackId(_) => {
-            expander.set_child(Some(&label));
-        }
-        ObjectId::AlbumId(_) => {
-            let image = Image::new();
-            image.add_css_class("large-icons");
-            dataobj
-                .bind_property("image", &image, "file")
-                .sync_create()
-                .build();
-
-            let box_ = gtk4::Box::new(Orientation::Horizontal, 10);
-            box_.append(&image);
-            box_.append(&label);
-            expander.set_child(Some(&box_));
-        }
-        ObjectId::ArtistId(_) => {
-            expander.set_child(Some(&label));
-        }
-        ObjectId::Genre(_) => {
-            expander.set_child(Some(&label));
-        }
-        ObjectId::Year(_) => {
-            label.add_css_class("numeric");
-            expander.set_child(Some(&label));
-        }
-    }
-}
-
-fn create(
-    item: &Object,
-    database: &DatabasePtr,
-    grouping_mode: &GroupingModePtr,
-    search_result: &SearchResultPtr,
-) -> Option<gio::ListModel> {
-    let item = item.downcast_ref::<MediaListItem>().unwrap();
-    let grouping_mode = grouping_mode.get();
-
-    let current = item.stored_object();
-    let current_category = Category::of(&current);
-    let next_category = grouping_mode.next_category(current_category);
-
-    let mut filters = item.filters();
-    filters.push(current);
-
-    match (current, next_category) {
-        (ObjectId::None, _) => None,
-        (ObjectId::TrackId(_), _) => None,
-        (ObjectId::AlbumId(album_id), Category::Track) => {
-            let store = gio::ListStore::new::<MediaListItem>();
-            let db = database.read().unwrap();
-            let search_result = search_result.borrow();
-
-            for track in db.sorted_tracks_of_album(album_id) {
-                if db.track_matches_filter(track, &filters) && search_result.has_track(track) {
-                    store.append(&MediaListItem::new_track(track, filters.clone(), &db));
+            (ObjectId::Genre(genre), Category::Album) => {
+                for album in database.sorted_albums_of_genre(genre) {
+                    if database.album_matches_filter(album, &filters)
+                        && search_result.has_album(album)
+                    {
+                        store.append(&MediaListItem::new_album(album, filters.clone(), &database));
+                    }
                 }
+
+                Some(store.upcast())
             }
-
-            Some(store.upcast())
-        }
-        (ObjectId::ArtistId(artist_id), Category::Album) => {
-            let store = gio::ListStore::new::<MediaListItem>();
-            let db = database.read().unwrap();
-            let search_result = search_result.borrow();
-
-            for album in db.sorted_albums_of_artist(artist_id) {
-                if db.album_matches_filter(album, &filters) && search_result.has_album(album) {
-                    store.append(&MediaListItem::new_album(album, filters.clone(), &db));
+            (ObjectId::Genre(genre), Category::Year) => {
+                for year in database.sorted_years_of_genre(genre) {
+                    // TODO: _matches_filter
+                    if search_result.has_year(year) {
+                        store.append(&MediaListItem::new_year(year, filters.clone()));
+                    }
                 }
+
+                Some(store.upcast())
             }
-
-            Some(store.upcast())
-        }
-        (ObjectId::ArtistId(artist_id), Category::Year) => {
-            let store = gio::ListStore::new::<MediaListItem>();
-            let db = database.read().unwrap();
-            let search_result = search_result.borrow();
-
-            for year in db.sorted_years_of_artist(artist_id) {
-                // TODO: _matches_filter
-                if search_result.has_year(year) {
-                    store.append(&MediaListItem::new_year(year, filters.clone()));
+            (ObjectId::Genre(genre), Category::Artist) => {
+                for artist in database.sorted_artists_of_genre(genre) {
+                    // TODO: _matches_filter
+                    if search_result.has_artist(artist) {
+                        store.append(&MediaListItem::new_artist(
+                            artist,
+                            filters.clone(),
+                            &database,
+                        ));
+                    }
                 }
+
+                Some(store.upcast())
             }
-
-            Some(store.upcast())
-        }
-        (ObjectId::Genre(genre), Category::Album) => {
-            let store = gio::ListStore::new::<MediaListItem>();
-            let db = database.read().unwrap();
-            let search_result = search_result.borrow();
-
-            for album in db.sorted_albums_of_genre(genre) {
-                if db.album_matches_filter(album, &filters) && search_result.has_album(album) {
-                    store.append(&MediaListItem::new_album(album, filters.clone(), &db));
+            (ObjectId::Year(year), Category::Album) => {
+                for album in database.sorted_albums_of_year(year) {
+                    if database.album_matches_filter(album, &filters)
+                        && search_result.has_album(album)
+                    {
+                        store.append(&MediaListItem::new_album(album, filters.clone(), &database));
+                    }
                 }
+
+                Some(store.upcast())
             }
-
-            Some(store.upcast())
-        }
-        (ObjectId::Genre(genre), Category::Year) => {
-            let store = gio::ListStore::new::<MediaListItem>();
-            let db = database.read().unwrap();
-            let search_result = search_result.borrow();
-
-            for year in db.sorted_years_of_genre(genre) {
-                // TODO: _matches_filter
-                if search_result.has_year(year) {
-                    store.append(&MediaListItem::new_year(year, filters.clone()));
-                }
-            }
-
-            Some(store.upcast())
-        }
-        (ObjectId::Genre(genre), Category::Artist) => {
-            let store = gio::ListStore::new::<MediaListItem>();
-            let db = database.read().unwrap();
-            let search_result = search_result.borrow();
-
-            for artist in db.sorted_artists_of_genre(genre) {
-                // TODO: _matches_filter
-                if search_result.has_artist(artist) {
-                    store.append(&MediaListItem::new_artist(artist, filters.clone(), &db));
-                }
-            }
-
-            Some(store.upcast())
-        }
-        (ObjectId::Year(year), Category::Album) => {
-            let store = gio::ListStore::new::<MediaListItem>();
-            let db = database.read().unwrap();
-            let search_result = search_result.borrow();
-
-            for album in db.sorted_albums_of_year(year) {
-                if db.album_matches_filter(album, &filters) && search_result.has_album(album) {
-                    store.append(&MediaListItem::new_album(album, filters.clone(), &db));
-                }
-            }
-
-            Some(store.upcast())
-        }
-        _ => panic!(
-            "cannot get {:?} out of {:?}",
-            next_category, current_category
-        ),
-    }
-}
-
-fn drag_prepare(drag_source: &DragSource, x: f64, y: f64) -> Option<gdk::ContentProvider> {
-    let list_view = drag_source.widget().and_downcast::<ListView>().unwrap();
-    let selection = list_view.model().unwrap();
-
-    let mut current = list_view.pick(x, y, PickFlags::DEFAULT).unwrap();
-    while current.type_() != TreeExpander::static_type() {
-        if let Some(parent) = current.parent() {
-            current = parent;
-        } else {
-            return None;
-        }
-    }
-    let current = current.downcast::<TreeExpander>().unwrap();
-    let current = current.list_row().unwrap();
-
-    for i in 0..selection.n_items() {
-        if selection.item(i).unwrap() == current && !selection.is_selected(i) {
-            selection.select_item(i, true);
-            break;
+            _ => panic!(
+                "cannot get {:?} out of {:?}",
+                next_category, current_category
+            ),
         }
     }
 
-    let mut object_ids = ObjectIds::new();
-    for i in 0..selection.n_items() {
-        if selection.is_selected(i) {
-            let row = selection
-                .item(i)
-                .unwrap()
-                .downcast::<TreeListRow>()
-                .unwrap();
-            let dataobj = row.item().and_downcast::<MediaListItem>().unwrap();
-            object_ids.push(dataobj.stored_object());
-        }
-    }
+    fn drag_prepare(drag_source: &DragSource, x: f64, y: f64) -> Option<gdk::ContentProvider> {
+        let list_view = drag_source.widget().and_downcast::<ListView>().unwrap();
+        let selection = list_view.model().unwrap();
 
-    let value = Value::from(object_ids);
-    let content = gdk::ContentProvider::for_value(&value);
-    Some(content)
+        let mut current = list_view.pick(x, y, PickFlags::DEFAULT).unwrap();
+        while current.type_() != TreeExpander::static_type() {
+            if let Some(parent) = current.parent() {
+                current = parent;
+            } else {
+                return None;
+            }
+        }
+        let current = current.downcast::<TreeExpander>().unwrap();
+        let current = current.list_row().unwrap();
+
+        for i in 0..selection.n_items() {
+            if selection.item(i).unwrap() == current && !selection.is_selected(i) {
+                selection.select_item(i, true);
+                break;
+            }
+        }
+
+        let mut object_ids = ObjectIds::new();
+        for i in 0..selection.n_items() {
+            if selection.is_selected(i) {
+                let row = selection
+                    .item(i)
+                    .unwrap()
+                    .downcast::<TreeListRow>()
+                    .unwrap();
+                let dataobj = row.item().and_downcast::<MediaListItem>().unwrap();
+                object_ids.push(dataobj.stored_object());
+            }
+        }
+
+        let value = Value::from(object_ids);
+        let content = gdk::ContentProvider::for_value(&value);
+        Some(content)
+    }
 }
