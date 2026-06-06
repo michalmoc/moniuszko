@@ -8,12 +8,14 @@ mod imp {
     use crate::player::playback_status::PlaybackStatus;
     use crate::player::repeat_mode::RepeatMode;
     use crate::playlist::PlaylistItem;
+    use adw::glib::subclass::Signal;
     use gtk4::glib::{Object, Properties, clone};
     use gtk4::prelude::ObjectExt;
-    use gtk4::subclass::prelude::{DerivedObjectProperties, ObjectSubclassExt};
+    use gtk4::subclass::prelude::{DerivedObjectProperties, ObjectImplExt, ObjectSubclassExt};
     use gtk4::subclass::prelude::{ObjectImpl, ObjectSubclass};
     use gtk4::{MediaFile, glib};
     use std::cell::{Cell, RefCell};
+    use std::sync::OnceLock;
 
     #[derive(Default, Properties)]
     #[properties(wrapper_type = super::PlaybackState)]
@@ -53,7 +55,23 @@ mod imp {
     }
 
     #[glib::derived_properties]
-    impl ObjectImpl for PlaybackState {}
+    impl ObjectImpl for PlaybackState {
+        fn constructed(&self) {
+            self.parent_constructed();
+
+            let obj = self.obj();
+            obj.connect_ended_notify(|p| {
+                if p.ended() {
+                    p.emit_by_name::<()>("ended", &[])
+                }
+            });
+        }
+
+        fn signals() -> &'static [Signal] {
+            static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
+            SIGNALS.get_or_init(|| vec![Signal::builder("ended").build()])
+        }
+    }
 
     impl PlaybackState {
         fn change_current(&self, current: Option<PlaylistItem>) {

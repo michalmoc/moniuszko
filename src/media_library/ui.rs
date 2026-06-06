@@ -15,18 +15,15 @@ glib::wrapper! {
         @implements gtk4::Accessible, gtk4::Buildable, gtk4::ConstraintTarget;
 }
 impl MediaLibraryUi {
-    pub fn new(
+    pub fn bind_data(
+        &self,
         database: DatabasePtr,
         search_result: SearchResultPtr,
         grouping_mode: GroupingModePtr,
-    ) -> Self {
-        let obj: Self = Object::builder().build();
-
-        obj.imp().database.replace(Some(database));
-        obj.imp().search_result.replace(Some(search_result));
-        obj.imp().grouping_mode.replace(Some(grouping_mode));
-
-        obj
+    ) {
+        self.imp().database.replace(Some(database));
+        self.imp().search_result.replace(Some(search_result));
+        self.imp().grouping_mode.replace(Some(grouping_mode));
     }
 
     pub fn database(&self) -> Ref<'_, DatabasePtr> {

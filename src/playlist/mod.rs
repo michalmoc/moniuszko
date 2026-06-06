@@ -4,10 +4,10 @@ mod ui;
 mod ui_item;
 
 use crate::config::ConfigPtr;
-use crate::database::{DatabasePtr, TrackId};
+use crate::database::{Database, DatabasePtr, TrackId};
 pub use dnd_item::ObjectIds;
 use gio::prelude::{ListModelExt, ListModelExtManual};
-use gtk4::prelude::{Cast, CastNone};
+use gtk4::prelude::{Cast, CastNone, StaticType};
 use std::fs;
 pub use ui::PlaylistUi;
 pub use ui_item::{PlaylistEntryUuid, PlaylistEntryUuids, PlaylistItem};
@@ -18,16 +18,15 @@ pub struct Playlist {
 }
 
 impl Playlist {
-    pub fn load_or_new(database: &DatabasePtr, config: ConfigPtr) -> Self {
+    pub fn wrap_and_load(store: gio::ListStore, database: &Database, config: ConfigPtr) -> Self {
         let path = config.read().unwrap().playlists_path();
-        let store = gio::ListStore::new::<PlaylistItem>();
 
+        println!("path: {:?}", path);
         if let Ok(file) = fs::File::open(path) {
             let tracks: Vec<TrackId> = serde_json::from_reader(file).unwrap();
-            let db = database.read().unwrap();
             for track_id in tracks {
-                if db.has_track(track_id) {
-                    store.append(&PlaylistItem::new(track_id, &db));
+                if database.has_track(track_id) {
+                    store.append(&PlaylistItem::new(track_id, database));
                 }
             }
         }

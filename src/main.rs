@@ -53,31 +53,19 @@ use sys_locale::get_locale;
 include!(concat!(env!("OUT_DIR"), "/static_cache.rs"));
 
 pub fn set_global_locale_gettext() {
-    // Prepare i18n
-    let a = setlocale(LocaleCategory::LcAll, "");
-    println!("{:?}", a);
-
-    let a = bindtextdomain(
+    setlocale(LocaleCategory::LcAll, "");
+    bindtextdomain(
         "moniuszko",
         env!("CARGO_MANIFEST_DIR").to_owned() + "/assets/gettext",
     )
     .expect("Unable to bind the text domain");
-    println!("{:?}", a);
 
-    let a =
-        bind_textdomain_codeset("moniuszko", "UTF-8").expect("Unable to set text domain encoding");
-    println!("{:?}", a);
-
-    let a = textdomain("moniuszko").expect("Unable to switch to the text domain");
-    println!("{:?}", a);
+    bind_textdomain_codeset("moniuszko", "UTF-8").expect("Unable to set text domain encoding");
+    textdomain("moniuszko").expect("Unable to switch to the text domain");
 }
 
 fn main() -> glib::ExitCode {
-    //set_global_locale();
     set_global_locale_gettext();
-
-    println!("{:?}", gettext("menu-playlist"));
-    println!("{:?}", dgettext(Some("moniuszko"), "menu-playlist"));
 
     gio::resources_register_include!("moniuszko.gresource").expect("Failed to register resources.");
 
@@ -94,48 +82,13 @@ fn main() -> glib::ExitCode {
     let config_ptr = Arc::new(RwLock::new(config));
     let scanner_ptr = Arc::new(RwLock::new(scanner));
     let database_ptr = Arc::new(RwLock::new(database));
-    let grouping_mode_ptr = Rc::new(Cell::new(GroupingMode::Album));
 
     let application = adw::Application::builder().application_id(APP_ID).build();
 
     application.connect_startup(|_| load_css());
-    let config_clone = config_ptr.clone();
-    application.connect_activate(move |a| {
-        build_ui(a)
-        // build_ui(
-        //     a,
-        //     &database_ptr,
-        //     &scanner_ptr,
-        //     &config_clone,
-        //     &grouping_mode_ptr,
-        // )
-    });
+    application.connect_activate(move |a| build_ui(a, &database_ptr, &config_ptr));
 
-    let result = application.run();
-
-    result
-}
-
-fn set_global_locale() {
-    let requested: Vec<LanguageIdentifier> = get_locale()
-        .and_then(|l| l.parse().ok())
-        .into_iter()
-        .collect_vec();
-
-    let available: Vec<LanguageIdentifier> =
-        LOCALES.keys().filter_map(|l| l.parse().ok()).collect_vec();
-
-    let default: LanguageIdentifier = "en-UK".parse().expect("Parsing langid failed.");
-
-    let supported = negotiate_languages(
-        &requested,
-        &available,
-        Some(&default),
-        NegotiationStrategy::Filtering,
-    );
-
-    let locale = supported[0];
-    set_lang(locale.to_string().parse().unwrap());
+    application.run()
 }
 
 fn load_css() {
@@ -150,10 +103,33 @@ fn load_css() {
     );
 }
 
-fn build_ui(app: &adw::Application) {
-    // Create new window and present it
-    let window = Window::new(app);
+fn build_ui(app: &adw::Application, database: &DatabasePtr, config: &ConfigPtr) {
+    let grouping_mode = Rc::new(Cell::new(GroupingMode::Album));
+    let search_result = Rc::new(RefCell::new(SearchResult::default()));
+    let (sender, receiver) = async_channel::unbounded();
+
+    let window = Window::new(app, &config.read().unwrap());
+    window.bind_data(
+        database.clone(),
+        search_result,
+        grouping_mode,
+        config.clone(),
+        sender,
+    );
     window.present();
+
+    let playlist = window.playlist();
+    let playback = window.playback();
+    let media_library = window.media_library();
+
+    glib::spawn_future_local(process_commands(
+        receiver,
+        window.upcast(),
+        playlist,
+        playback,
+        database.clone(),
+        media_library,
+    ));
 }
 //
 // fn build_ui(
@@ -163,120 +139,13 @@ fn build_ui(app: &adw::Application) {
 //     config: &ConfigPtr,
 //     grouping_mode: &GroupingModePtr,
 // ) {
-//     let (sender, receiver) = async_channel::unbounded();
-//
-//     let config_button = make_menu_button();
-//
-//     let titlebar = HeaderBar::new();
-//     titlebar.pack_start(&config_button);
-//
-//     let window = ApplicationWindow::builder()
-//         .application(app)
-//         .titlebar(&titlebar)
-//         .title(FANCY_APP_NAME)
-//         .default_width(config.read().unwrap().window_width)
-//         .default_height(config.read().unwrap().window_height)
-//         .maximized(config.read().unwrap().window_maximized)
-//         .hide_on_close(config.read().unwrap().hide_on_close)
-//         .build();
-//
-//     let playlist = Playlist::load_or_new(database, config.clone());
-//
-//     let playlist_ui = PlaylistUi::new(&playlist);
-//
-//     playlist_ui.connect_request_append_tracks(clone!(
-//         #[strong]
-//         sender,
-//         move |objs| {
-//             sender
-//                 .send_blocking(Command::AppendToPlaylist(objs))
-//                 .unwrap()
-//         }
-//     ));
-//
-//     playlist_ui.connect_request_insert_tracks(clone!(
-//         #[strong]
-//         sender,
-//         move |objs, pos| {
-//             sender
-//                 .send_blocking(Command::InsertInPlaylist(objs, pos))
-//                 .unwrap()
-//         }
-//     ));
-//
-//     playlist_ui.connect_request_remove_tracks(clone!(
-//         #[strong]
-//         sender,
-//         move |uuids| {
-//             sender
-//                 .send_blocking(Command::RemoveFromPlaylist(uuids))
-//                 .unwrap()
-//         }
-//     ));
-//
-//     let playlist_sw = gtk::ScrolledWindow::builder()
-//         .hscrollbar_policy(gtk::PolicyType::Automatic)
-//         .min_content_width(120)
-//         .child(&playlist_ui)
-//         .vexpand(true)
-//         .hexpand(true)
-//         .build();
-//
-//     let playback_state = PlaybackState::new();
-//     let playback_state_clone = playback_state.clone();
-//     let commands_clone = sender.clone();
-//     playback_state.connect_ended_notify(move |_| {
-//         if playback_state_clone.ended() {
-//             commands_clone.send_blocking(Command::Next).unwrap();
-//         }
-//     });
-//
-//     let player = PlayerUi::new(playback_state.clone());
-//
-//     player.connect_next_track(clone!(
-//         #[strong]
-//         sender,
-//         move || {
-//             sender.send_blocking(Command::Next).unwrap();
-//         }
-//     ));
-//
-//     player.connect_play_pause(clone!(
-//         #[strong]
-//         sender,
-//         move || {
-//             sender.send_blocking(Command::PlayPause).unwrap();
-//         }
-//     ));
-//
-//     player.connect_previous_track(clone!(
-//         #[strong]
-//         sender,
-//         move || {
-//             sender.send_blocking(Command::Previous).unwrap();
-//         }
-//     ));
+
 //
 //     playlist_ui.connect_activate(clone!(
 //         #[strong]
 //         sender,
 //         move |_, p| sender.send_blocking(Command::PlayFromPlaylist(p)).unwrap()
 //     ));
-//
-//     let box_ = gtk4::Box::new(Orientation::Vertical, 0);
-//     box_.append(&playlist_sw);
-//     box_.append(&player);
-//
-//     let search = SearchEntry::new();
-//     let search_result = Rc::new(RefCell::new(SearchResult::default()));
-//
-//     let media_library = MediaLibraryUi::new(
-//         database.clone(),
-//         search_result.clone(),
-//         grouping_mode.clone(),
-//     );
-//     media_library.repopulate();
-//     media_library.set_vexpand(true);
 //
 //     media_library.connect_activate(clone!(
 //         #[strong]
@@ -288,22 +157,7 @@ fn build_ui(app: &adw::Application) {
 //         }
 //     ));
 //
-//     let media_library_sw = gtk::ScrolledWindow::builder()
-//         .hscrollbar_policy(gtk::PolicyType::Automatic)
-//         .min_content_width(120)
-//         .child(&media_library)
-//         .vexpand(true)
-//         .hexpand(false)
-//         .build();
 //
-//     let grouping_mode_list = StringList::new(&[]);
-//     for e in GroupingMode::all_str() {
-//         grouping_mode_list.append(&e);
-//     }
-//
-//     let grouping_mode_choice = DropDown::new(Some(grouping_mode_list), None::<Expression>);
-//     grouping_mode_choice.set_selected(1);
-//     grouping_mode_choice.set_hexpand(true);
 //     let sender_clone = sender.clone();
 //     let grouping_mode_clone = grouping_mode.clone();
 //     grouping_mode_choice.connect_selected_item_notify(move |d| {
@@ -318,7 +172,6 @@ fn build_ui(app: &adw::Application) {
 //         )
 //     });
 //
-//     let refresh_button = Button::from_icon_name("view-refresh");
 //     let database_clone = database.clone();
 //     let scanner_clone = scanner.clone();
 //     let config_clone = config.clone();
@@ -333,10 +186,6 @@ fn build_ui(app: &adw::Application) {
 //         )
 //     });
 //
-//     let library_bottom_box = gtk4::Box::new(Orientation::Horizontal, 0);
-//     library_bottom_box.append(&grouping_mode_choice);
-//     library_bottom_box.append(&refresh_button);
-//
 //     search.connect_search_changed(clone!(
 //         #[weak]
 //         search_result,
@@ -347,14 +196,6 @@ fn build_ui(app: &adw::Application) {
 //         move |s| on_search_changed(s, &search_result, &database, &sender)
 //     ));
 //
-//     let media_library_box = gtk4::Box::new(Orientation::Vertical, 0);
-//     media_library_box.append(&search);
-//     media_library_box.append(&media_library_sw);
-//     media_library_box.append(&library_bottom_box);
-//
-//     let paned = Paned::new(Orientation::Horizontal);
-//     paned.set_start_child(Some(&media_library_box));
-//     paned.set_end_child(Some(&box_));
 //
 //     let action_delete_selected = ActionEntry::builder("current-playlist-delete-selected")
 //         .activate(clone!(
@@ -420,18 +261,7 @@ fn build_ui(app: &adw::Application) {
 //         Propagation::Proceed
 //     });
 //
-//     window.set_child(Some(&paned));
 //
-//     window.present();
-//
-//     glib::spawn_future_local(process_commands(
-//         receiver,
-//         window.upcast(),
-//         playlist,
-//         playback_state.clone(),
-//         database.clone(),
-//         media_library,
-//     ));
 //
 //     glib::spawn_future_local(mpris(sender.clone(), playback_state, database.clone()));
 //
@@ -440,29 +270,6 @@ fn build_ui(app: &adw::Application) {
 //     }
 // }
 //
-// fn make_menu_button() -> MenuButton {
-//     let menu_playlist = Menu::new();
-//     menu_playlist.append(
-//         Some(&t!("menu-remove-selected-from-playlist")),
-//         Some("app.current-playlist-delete-selected"),
-//     );
-//     menu_playlist.append(
-//         Some(&t!("menu-clear-playlist")),
-//         Some("app.current-playlist-clear"),
-//     );
-//
-//     let menu_program = Menu::new();
-//     menu_program.append(Some(&t!("menu-config")), Some("app.config"));
-//     menu_program.append(Some(&t!("menu-quit")), Some("app.quit"));
-//
-//     let menu_model = Menu::new();
-//     menu_model.append_section(Some(&t!("menu-playlist")), &menu_playlist);
-//     menu_model.append_section(Some(&t!("menu-program")), &menu_program);
-//
-//     let config_button = MenuButton::new();
-//     config_button.set_menu_model(Some(&menu_model));
-//     config_button
-// }
 //
 // fn refresh_button_cb(
 //     button: &Button,
