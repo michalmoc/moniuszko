@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="moniuszko">
+    <template class="MyGtkAppWindow" parent="AdwApplicationWindow">
+        <property name="title">Moniuszko</property>
+        <property name="content">
+            <object class="AdwToolbarView">
+                <child type="top">
+                    <object class="AdwHeaderBar">
+                        <child type="start">
+                            <object class="GtkMenuButton">
+                                <property name="menu_model">
+                                    <menu>
+                                        <section>
+                                            <attribute name="label" translatable="yes">menu-playlist</attribute>
+                                            <item>
+                                                <attribute name="label" translatable="yes">menu-remove-selected-from-playlist</attribute>
+                                                <attribute
+                                                        name="action">app.current-playlist-delete-selected</attribute>
+                                            </item>
+                                            <item>
+                                                <attribute name="label"
+                                                           translatable="yes">menu-clear-playlist</attribute>
+                                                <attribute name="action">app.current-playlist-clear</attribute>
+                                            </item>
+                                        </section>
+                                        <section>
+                                            <attribute name="label" translatable="yes">menu-program</attribute>
+                                            <item>
+                                                <attribute name="label" translatable="yes">menu-config</attribute>
+                                                <attribute name="action">app.config</attribute>
+                                            </item>
+                                            <item>
+                                                <attribute name="label" translatable="yes">menu-quit</attribute>
+                                                <attribute name="action">app.quit</attribute>
+                                            </item>
+                                        </section>
+                                    </menu>
+                                </property>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+
+                <property name="content">
+                    <object class="GtkButton">
+                        <property name="label">Press me!</property>
+                        <property name="margin-top">12</property>
+                        <property name="margin-bottom">12</property>
+                        <property name="margin-start">12</property>
+                        <property name="margin-end">12</property>
+                    </object>
+                </property>
+            </object>
+        </property>
+    </template>
+</interface>
