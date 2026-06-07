@@ -38,23 +38,6 @@ impl MediaLibraryUi {
         Ref::map(self.imp().grouping_mode.borrow(), |r| r.as_ref().unwrap())
     }
 
-    pub fn connect_activate<F>(&self, f: F)
-    where
-        F: Fn(ObjectId) + 'static,
-    {
-        let view_ptr = self.imp().view.borrow();
-        let view = view_ptr.as_ref().unwrap();
-
-        view.connect_activate(move |w, p| {
-            let sm = w.model().and_downcast::<MultiSelection>().unwrap();
-            let store = sm.model().unwrap();
-
-            let row = store.item(p).and_downcast::<TreeListRow>().unwrap();
-            let item = row.item().and_downcast::<MediaListItem>().unwrap();
-            f(item.stored_object());
-        });
-    }
-
     pub fn repopulate(&self) {
         let view_ptr = self.imp().view.borrow();
         let view = view_ptr.as_ref().unwrap();
@@ -122,12 +105,13 @@ mod imp {
     use crate::media_library::GroupingModePtr;
     use crate::media_library::grouping_mode::Category;
     use crate::media_library::ui_item::MediaListItem;
-    use crate::playlist::ObjectIds;
+    use crate::playlist::{ObjectIds, PlaylistEntryUuids};
     use adw::glib;
     use adw::glib::Properties;
+    use adw::glib::subclass::Signal;
     use adw::subclass::prelude::{ObjectImpl, ObjectImplExt, ObjectSubclass, ObjectSubclassExt};
     use gio::prelude::ListModelExt;
-    use gtk4::glib::{Object, Value};
+    use gtk4::glib::{Object, Value, clone};
     use gtk4::prelude::{
         BoxExt, Cast, CastNone, EventControllerExt, ListItemExt, ObjectExt, SelectionModelExt,
         StaticType, WidgetExt,
@@ -139,6 +123,7 @@ mod imp {
         SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget, gdk,
     };
     use std::cell::RefCell;
+    use std::sync::OnceLock;
 
     #[derive(Properties, Default)]
     #[properties(wrapper_type = super::MediaLibraryUi)]
@@ -170,6 +155,18 @@ mod imp {
 
             let view = new_view(obj.clone());
             view.set_parent(&*obj);
+            view.connect_activate(clone!(
+                #[strong]
+                obj,
+                move |w, p| {
+                    let sm = w.model().and_downcast::<MultiSelection>().unwrap();
+                    let store = sm.model().unwrap();
+
+                    let row = store.item(p).and_downcast::<TreeListRow>().unwrap();
+                    let item = row.item().and_downcast::<MediaListItem>().unwrap();
+                    obj.emit_by_name::<()>("activate", &[&item.stored_object()]);
+                }
+            ));
             self.view.replace(Some(view));
         }
 
@@ -177,6 +174,17 @@ mod imp {
             if let Some(child) = self.view.borrow_mut().take() {
                 child.unparent();
             }
+        }
+
+        fn signals() -> &'static [Signal] {
+            static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
+            SIGNALS.get_or_init(|| {
+                vec![
+                    Signal::builder("activate")
+                        .param_types([ObjectId::static_type()])
+                        .build(),
+                ]
+            })
         }
     }
 

@@ -86,7 +86,7 @@ fn main() -> glib::ExitCode {
     let application = adw::Application::builder().application_id(APP_ID).build();
 
     application.connect_startup(|_| load_css());
-    application.connect_activate(move |a| build_ui(a, &database_ptr, &config_ptr));
+    application.connect_activate(move |a| build_ui(a, &database_ptr, &config_ptr, &scanner_ptr));
 
     application.run()
 }
@@ -103,7 +103,12 @@ fn load_css() {
     );
 }
 
-fn build_ui(app: &adw::Application, database: &DatabasePtr, config: &ConfigPtr) {
+fn build_ui(
+    app: &adw::Application,
+    database: &DatabasePtr,
+    config: &ConfigPtr,
+    scanner: &ScannerPtr,
+) {
     let grouping_mode = Rc::new(Cell::new(GroupingMode::Album));
     let search_result = Rc::new(RefCell::new(SearchResult::default()));
     let (sender, receiver) = async_channel::unbounded();
@@ -115,9 +120,11 @@ fn build_ui(app: &adw::Application, database: &DatabasePtr, config: &ConfigPtr) 
         grouping_mode,
         config.clone(),
         sender,
+        scanner.clone(),
     );
     window.present();
 
+    // TODO: present inside window, no need to pass
     let playlist = window.playlist();
     let playback = window.playback();
     let media_library = window.media_library();
@@ -139,64 +146,6 @@ fn build_ui(app: &adw::Application, database: &DatabasePtr, config: &ConfigPtr) 
 //     config: &ConfigPtr,
 //     grouping_mode: &GroupingModePtr,
 // ) {
-
-//
-//     playlist_ui.connect_activate(clone!(
-//         #[strong]
-//         sender,
-//         move |_, p| sender.send_blocking(Command::PlayFromPlaylist(p)).unwrap()
-//     ));
-//
-//     media_library.connect_activate(clone!(
-//         #[strong]
-//         sender,
-//         move |obj| {
-//             sender
-//                 .send_blocking(Command::AppendToPlaylist(ObjectIds::single(obj)))
-//                 .unwrap();
-//         }
-//     ));
-//
-//
-//     let sender_clone = sender.clone();
-//     let grouping_mode_clone = grouping_mode.clone();
-//     grouping_mode_choice.connect_selected_item_notify(move |d| {
-//         on_grouping_mode_change(
-//             d.selected_item()
-//                 .and_downcast::<StringObject>()
-//                 .unwrap()
-//                 .string()
-//                 .as_str(),
-//             &grouping_mode_clone,
-//             &sender_clone,
-//         )
-//     });
-//
-//     let database_clone = database.clone();
-//     let scanner_clone = scanner.clone();
-//     let config_clone = config.clone();
-//     let sender_clone = sender.clone();
-//     refresh_button.connect_clicked(move |button| {
-//         refresh_button_cb(
-//             button,
-//             &database_clone,
-//             &scanner_clone,
-//             &config_clone,
-//             &sender_clone,
-//         )
-//     });
-//
-//     search.connect_search_changed(clone!(
-//         #[weak]
-//         search_result,
-//         #[weak]
-//         database,
-//         #[strong]
-//         sender,
-//         move |s| on_search_changed(s, &search_result, &database, &sender)
-//     ));
-//
-//
 //     let action_delete_selected = ActionEntry::builder("current-playlist-delete-selected")
 //         .activate(clone!(
 //             #[weak]
@@ -271,73 +220,9 @@ fn build_ui(app: &adw::Application, database: &DatabasePtr, config: &ConfigPtr) 
 // }
 //
 //
-// fn refresh_button_cb(
-//     button: &Button,
-//     database: &DatabasePtr,
-//     scanner: &ScannerPtr,
-//     config: &ConfigPtr,
-//     commands: &Sender<Command>,
-// ) {
-//     let database_clone = database.clone();
-//     let scanner_clone = scanner.clone();
-//     let button_clone = button.clone();
-//     let config_clone = config.clone();
-//     let commands_clone = commands.clone();
 //
-//     glib::spawn_future_local(async move {
-//         button_clone.set_sensitive(false);
+
 //
-//         let enable_button = gio::spawn_blocking(move || {
-//             let config = config_clone.read().unwrap();
-//             let mut scanner = scanner_clone.write().unwrap();
-//             scanner.scan(&config.media_path, &config);
-//             let db = scanner.make_database();
-//
-//             fs::create_dir_all(config.database_path().parent().unwrap()).unwrap();
-//             let file = File::create(config.database_path()).unwrap();
-//             serde_json::to_writer(file, scanner.deref()).unwrap();
-//
-//             *database_clone.write().unwrap() = db;
-//
-//             true
-//         })
-//         .await
-//         .expect("Task needs to finish successfully.");
-//
-//         commands_clone
-//             .send_blocking(Command::RepopulateMediaLibrary)
-//             .unwrap();
-//         commands_clone
-//             .send_blocking(Command::RefreshPlaylist)
-//             .unwrap();
-//
-//         button_clone.set_sensitive(enable_button);
-//     });
-// }
-//
-// fn on_grouping_mode_change(
-//     selected: &str,
-//     grouping_mode: &GroupingModePtr,
-//     sender: &Sender<Command>,
-// ) {
-//     grouping_mode.set(GroupingMode::from_str(selected).unwrap());
-//     sender
-//         .send_blocking(Command::RepopulateMediaLibrary)
-//         .unwrap();
-// }
-//
-// fn on_search_changed(
-//     searcher: &SearchEntry,
-//     search_result: &SearchResultPtr,
-//     database: &DatabasePtr,
-//     sender: &Sender<Command>,
-// ) {
-//     let result = database.read().unwrap().search(&searcher.text());
-//     search_result.replace(result);
-//     sender
-//         .send_blocking(Command::RepopulateMediaLibrary)
-//         .unwrap();
-// }
 //
 // fn clear_library(database: &DatabasePtr, scanner: &ScannerPtr, sender: &Sender<Command>) {
 //     *database.write().unwrap() = Database::default();

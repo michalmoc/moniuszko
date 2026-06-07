@@ -44,21 +44,33 @@
                 <property name="content">
                     <object class="GtkPaned">
                         <property name="orientation">horizontal</property>
+                        <property name="position">512</property>
+
                         <child type="start">
                             <object class="GtkBox">
                                 <property name="orientation">vertical</property>
+
                                 <child>
-                                    <object class="GtkSearchEntry"/>
+                                    <object class="GtkSearchEntry" id="search_entry">
+                                        <signal name="search_changed"
+                                                handler="handle_search_changed"
+                                                swapped="true"/>
+                                    </object>
                                 </child>
                                 <child>
                                     <object class="GtkScrolledWindow">
                                         <property name="hscrollbar-policy">Automatic</property>
-                                        <property name="min_content_width">120</property>
+                                        <property name="min-content-width">256</property>
                                         <property name="hexpand">false</property>
                                         <property name="vexpand">true</property>
+                                        <property name="propagate-natural-width">true</property>
 
                                         <property name="child">
                                             <object class="MediaLibraryUi" id="media_library">
+                                                <signal name="activate"
+                                                        handler="handle_library_activate"
+                                                        swapped="true"/>
+
                                                 <property name="vexpand">true</property>
                                             </object>
                                         </property>
@@ -69,11 +81,19 @@
                                         <property name="orientation">horizontal</property>
                                         <child>
                                             <object class="GtkDropDown" id="grouping_mode">
+                                                <signal name="notify::selected-item"
+                                                        handler="handle_grouping_mode_change"
+                                                        swapped="true"/>
+
                                                 <property name="hexpand">true</property>
                                             </object>
                                         </child>
                                         <child>
-                                            <object class="GtkButton">
+                                            <object class="GtkButton" id="refresh_button">
+                                                <signal name="clicked"
+                                                        handler="handle_refresh"
+                                                        swapped="true"/>
+
                                                 <property name="icon-name">view-refresh</property>
                                             </object>
                                         </child>
@@ -102,6 +122,9 @@
                                                         swapped="true"/>
                                                 <signal name="request_remove_tracks"
                                                         handler="handle_request_remove_tracks"
+                                                        swapped="true"/>
+                                                <signal name="activate"
+                                                        handler="handle_playlist_activate"
                                                         swapped="true"/>
 
                                                 <property name="playlist">

@@ -1,5 +1,5 @@
 use crate::database::ObjectId;
-use fluent_zero::t;
+use gettextrs::gettext;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -42,29 +42,32 @@ pub enum GroupingMode {
 impl GroupingMode {
     pub fn from_str(input: &str) -> Option<GroupingMode> {
         HashMap::from([
-            (t!("none"), GroupingMode::None),
-            (t!("album"), GroupingMode::Album),
-            (t!("artist-album"), GroupingMode::ArtistAlbum),
-            (t!("artist-year-album"), GroupingMode::ArtistYearAlbum),
-            (t!("genre-album"), GroupingMode::GenreAlbum),
-            (t!("genre-year-album"), GroupingMode::GenreYearAlbum),
-            (t!("genre-artist-album"), GroupingMode::GenreArtistAlbum),
-            (t!("year-album"), GroupingMode::YearAlbum),
+            (gettext("none"), GroupingMode::None),
+            (gettext("album"), GroupingMode::Album),
+            (gettext("artist-album"), GroupingMode::ArtistAlbum),
+            (gettext("artist-year-album"), GroupingMode::ArtistYearAlbum),
+            (gettext("genre-album"), GroupingMode::GenreAlbum),
+            (gettext("genre-year-album"), GroupingMode::GenreYearAlbum),
+            (
+                gettext("genre-artist-album"),
+                GroupingMode::GenreArtistAlbum,
+            ),
+            (gettext("year-album"), GroupingMode::YearAlbum),
         ])
         .get(input)
         .copied()
     }
 
-    pub fn all_str() -> [Cow<'static, str>; 8] {
+    pub fn all_str() -> [String; 8] {
         [
-            t!("none"),
-            t!("album"),
-            t!("artist-album"),
-            t!("artist-year-album"),
-            t!("genre-album"),
-            t!("genre-year-album"),
-            t!("genre-artist-album"),
-            t!("year-album"),
+            gettext("none"),
+            gettext("album"),
+            gettext("artist-album"),
+            gettext("artist-year-album"),
+            gettext("genre-album"),
+            gettext("genre-year-album"),
+            gettext("genre-artist-album"),
+            gettext("year-album"),
         ]
     }
 

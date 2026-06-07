@@ -1,8 +1,8 @@
 use crate::commands::Command;
 use crate::config::{Config, ConfigPtr};
-use crate::database::{DatabasePtr, SearchResultPtr};
+use crate::database::{DatabasePtr, ScannerPtr, SearchResultPtr};
 use crate::media_library::{GroupingModePtr, MediaLibraryUi};
-use crate::player::{PlaybackState, PlaybackStatus};
+use crate::player::PlaybackState;
 use crate::playlist::Playlist;
 use adw::subclass::prelude::ObjectSubclassIsExt;
 use async_channel::Sender;
@@ -34,22 +34,26 @@ impl Window {
         grouping_mode: GroupingModePtr,
         config: ConfigPtr,
         commands: Sender<Command>,
+        scanner: ScannerPtr,
     ) {
-        let playlist = self.imp().playlist.playlist().unwrap();
-        let playlist = Playlist::wrap_and_load(playlist, &database.read().unwrap(), config);
-        self.imp().playlist_store.replace(Some(playlist));
-
-        self.imp()
-            .media_library
-            .bind_data(database, search_result, grouping_mode);
-
-        self.imp().media_library.repopulate();
-
-        self.imp().commands.replace(Some(commands));
+        self.imp().bind_data(
+            database,
+            search_result,
+            grouping_mode,
+            config,
+            commands,
+            scanner,
+        );
     }
 
     pub fn playlist(&self) -> Playlist {
-        self.imp().playlist_store.borrow().clone().unwrap()
+        self.imp()
+            .bound_data
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .playlist
+            .clone()
     }
 
     pub fn playback(&self) -> PlaybackState {
@@ -63,32 +67,45 @@ impl Window {
 
 mod imp {
     use crate::commands::Command;
-    use crate::media_library::{GroupingMode, MediaLibraryUi};
+    use crate::config::ConfigPtr;
+    use crate::database::{DatabasePtr, ObjectId, Scanner, ScannerPtr, SearchResultPtr};
+    use crate::media_library::{GroupingMode, GroupingModePtr, MediaLibraryUi};
     use crate::player::{PlaybackState, PlayerUi};
     use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuids, PlaylistItem, PlaylistUi};
-    use adw::subclass::prelude::AdwApplicationWindowImpl;
+    use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
     use async_channel::Sender;
-    use fluent_zero::{lookup_static, t};
     use gtk4::glib::subclass::InitializingObject;
-    use gtk4::prelude::StaticTypeExt;
+    use gtk4::glib::{Object, clone, closure_local};
+    use gtk4::prelude::{CastNone, EditableExt, StaticTypeExt, WidgetExt};
+    use gtk4::subclass::prelude::ObjectSubclassExt;
     use gtk4::subclass::prelude::{
-        ApplicationWindowImpl, CompositeTemplateCallbacks, CompositeTemplateClass, ObjectImpl,
-        ObjectSubclass,
+        ApplicationWindowImpl, CompositeTemplateClass, ObjectImpl, ObjectSubclass,
     };
     use gtk4::subclass::prelude::{ObjectImplExt, WidgetClassExt};
     use gtk4::subclass::widget::{
         CompositeTemplateCallbacksClass, CompositeTemplateInitializingExt, WidgetImpl,
     };
     use gtk4::subclass::window::WindowImpl;
-    use gtk4::{CompositeTemplate, DropDown, StringList, TemplateChild, glib, template_callbacks};
-    use std::borrow::Cow;
+    use gtk4::{
+        Button, CompositeTemplate, DropDown, SearchEntry, StringList, StringObject, TemplateChild,
+        glib, template_callbacks,
+    };
     use std::cell::RefCell;
+    use std::fs;
+    use std::fs::File;
+    use std::ops::Deref;
 
     #[derive(CompositeTemplate, Default)]
     #[template(resource = "/org/moniuszko/window.ui")]
     pub struct Window {
         #[template_child]
+        search_entry: TemplateChild<SearchEntry>,
+
+        #[template_child]
         pub grouping_mode: TemplateChild<DropDown>,
+
+        #[template_child]
+        pub refresh_button: TemplateChild<Button>,
 
         #[template_child]
         pub media_library: TemplateChild<MediaLibraryUi>,
@@ -102,8 +119,17 @@ mod imp {
         #[template_child]
         pub playback: TemplateChild<PlaybackState>,
 
-        pub commands: RefCell<Option<Sender<Command>>>,
-        pub playlist_store: RefCell<Option<Playlist>>,
+        pub bound_data: RefCell<Option<BoundData>>,
+    }
+
+    pub struct BoundData {
+        pub commands: Sender<Command>,
+        pub playlist: Playlist,
+        pub grouping_mode: GroupingModePtr,
+        pub database: DatabasePtr,
+        pub config: ConfigPtr,
+        pub scanner: ScannerPtr,
+        pub search_result: SearchResultPtr,
     }
 
     #[glib::object_subclass]
@@ -139,11 +165,44 @@ mod imp {
 
     #[template_callbacks]
     impl Window {
+        pub fn bind_data(
+            &self,
+            database: DatabasePtr,
+            search_result: SearchResultPtr,
+            grouping_mode: GroupingModePtr,
+            config: ConfigPtr,
+            commands: Sender<Command>,
+            scanner: ScannerPtr,
+        ) {
+            let playlist = self.playlist.playlist().unwrap();
+            let playlist =
+                Playlist::wrap_and_load(playlist, &database.read().unwrap(), config.clone());
+
+            self.media_library.bind_data(
+                database.clone(),
+                search_result.clone(),
+                grouping_mode.clone(),
+            );
+            self.media_library.repopulate();
+
+            self.bound_data.replace(Some(BoundData {
+                commands,
+                playlist,
+                grouping_mode,
+                database,
+                config,
+                scanner,
+                search_result,
+            }));
+        }
+
+        #[inline(always)]
         fn command(&self, command: Command) {
-            self.commands
+            self.bound_data
                 .borrow()
                 .as_ref()
                 .unwrap()
+                .commands
                 .send_blocking(command)
                 .unwrap()
         }
@@ -181,6 +240,88 @@ mod imp {
         #[template_callback]
         fn handle_previous_track(&self) {
             self.command(Command::Previous)
+        }
+
+        #[template_callback]
+        fn handle_playlist_activate(&self, pos: u32) {
+            self.command(Command::PlayFromPlaylist(pos))
+        }
+
+        #[template_callback]
+        fn handle_library_activate(&self, obj: ObjectId) {
+            self.command(Command::AppendToPlaylist(ObjectIds::single(obj)))
+        }
+
+        #[template_callback]
+        fn handle_grouping_mode_change(&self) {
+            if let Some(bound_data) = self.bound_data.borrow().as_ref() {
+                let selected = self
+                    .grouping_mode
+                    .selected_item()
+                    .and_downcast::<StringObject>()
+                    .unwrap()
+                    .string();
+                bound_data
+                    .grouping_mode
+                    .set(GroupingMode::from_str(&selected).unwrap());
+                self.command(Command::RepopulateMediaLibrary)
+            }
+        }
+
+        #[template_callback]
+        fn handle_refresh(&self) {
+            glib::spawn_future_local(clone!(
+                #[weak(rename_to=this)]
+                self,
+                async move {
+                    if let Some(bound_data) = this.bound_data.borrow().as_ref() {
+                        this.refresh_button.set_sensitive(false);
+
+                        // TODO: move somehow to commands
+
+                        gio::spawn_blocking(clone!(
+                            #[weak(rename_to=config)]
+                            bound_data.config,
+                            #[weak(rename_to=scanner)]
+                            bound_data.scanner,
+                            #[weak(rename_to=database)]
+                            bound_data.database,
+                            move || {
+                                let config = config.read().unwrap();
+                                let mut scanner = scanner.write().unwrap();
+                                scanner.scan(&config.media_path, &config);
+                                let db = scanner.make_database();
+
+                                fs::create_dir_all(config.database_path().parent().unwrap())
+                                    .unwrap();
+                                let file = File::create(config.database_path()).unwrap();
+                                serde_json::to_writer(file, scanner.deref()).unwrap();
+
+                                *database.write().unwrap() = db;
+                            }
+                        ))
+                        .await
+                        .expect("Task needs to finish successfully.");
+
+                        this.command(Command::RepopulateMediaLibrary);
+                        this.command(Command::RefreshPlaylist);
+
+                        this.refresh_button.set_sensitive(true);
+                    }
+                }
+            ));
+        }
+        #[template_callback]
+        fn handle_search_changed(&self) {
+            if let Some(bound_data) = self.bound_data.borrow().as_ref() {
+                let result = bound_data
+                    .database
+                    .read()
+                    .unwrap()
+                    .search(&self.search_entry.text());
+                bound_data.search_result.replace(result);
+                self.command(Command::RepopulateMediaLibrary)
+            }
         }
     }
 

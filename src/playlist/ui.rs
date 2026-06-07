@@ -20,19 +20,6 @@ impl PlaylistUi {
             .build()
     }
 
-    pub fn connect_activate<F: Fn(&Self, u32) + 'static>(&self, f: F) {
-        self.imp()
-            .view
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .connect_activate(clone!(
-                #[weak(rename_to = this)]
-                self,
-                move |_, pos| f(&this, pos)
-            ));
-    }
-
     pub fn connect_request_insert_tracks<F: Fn(ObjectIds, u32) + 'static>(&self, f: F) {
         self.connect_closure(
             "request-insert-tracks",
@@ -120,6 +107,15 @@ mod imp {
 
             let view = new_view(playlist, &obj);
             view.set_parent(&*obj);
+
+            view.connect_activate(clone!(
+                #[strong]
+                obj,
+                move |_, pos| {
+                    obj.emit_by_name::<()>("activate", &[&pos]);
+                }
+            ));
+
             self.view.replace(Some(view));
         }
 
@@ -141,6 +137,9 @@ mod imp {
                         .build(),
                     Signal::builder("request-insert-tracks")
                         .param_types([ObjectIds::static_type(), u32::static_type()])
+                        .build(),
+                    Signal::builder("activate")
+                        .param_types([u32::static_type()])
                         .build(),
                 ]
             })

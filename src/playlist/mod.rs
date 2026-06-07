@@ -21,7 +21,6 @@ impl Playlist {
     pub fn wrap_and_load(store: gio::ListStore, database: &Database, config: ConfigPtr) -> Self {
         let path = config.read().unwrap().playlists_path();
 
-        println!("path: {:?}", path);
         if let Ok(file) = fs::File::open(path) {
             let tracks: Vec<TrackId> = serde_json::from_reader(file).unwrap();
             for track_id in tracks {
