@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="moniuszko">
+    <template class="MyGtkAppWindow" parent="AdwApplicationWindow">
+        <signal name="close_request" handler="handle_close_request" swapped="true"/>
+
+        <property name="title">Moniuszko</property>
+        <property name="content">
+            <object class="AdwToolbarView">
+                <child type="top">
+                    <object class="AdwHeaderBar">
+                        <child type="start">
+                            <object class="GtkMenuButton">
+                                <property name="menu_model">
+                                    <menu>
+                                        <section>
+                                            <attribute name="label" translatable="yes">menu-playlist</attribute>
+                                            <item>
+                                                <attribute name="label" translatable="yes">menu-remove-selected-from-playlist</attribute>
+                                                <attribute
+                                                        name="action">current-playlist-delete-selected</attribute>
+                                            </item>
+                                            <item>
+                                                <attribute name="label"
+                                                           translatable="yes">menu-clear-playlist</attribute>
+                                                <attribute name="action">current-playlist-clear</attribute>
+                                            </item>
+                                        </section>
+                                        <section>
+                                            <attribute name="label" translatable="yes">menu-program</attribute>
+                                            <item>
+                                                <attribute name="label" translatable="yes">menu-config</attribute>
+                                                <attribute name="action">config</attribute>
+                                            </item>
+                                            <item>
+                                                <attribute name="label" translatable="yes">menu-quit</attribute>
+                                                <attribute name="action">quit</attribute>
+                                            </item>
+                                        </section>
+                                    </menu>
+                                </property>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+
+                <property name="content">
+                    <object class="GtkPaned">
+                        <property name="orientation">horizontal</property>
+                        <property name="position">512</property>
+
+                        <child type="start">
+                            <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+
+                                <child>
+                                    <object class="GtkSearchEntry" id="search_entry">
+                                        <signal name="search_changed"
+                                                handler="handle_search_changed"
+                                                swapped="true"/>
+                                    </object>
+                                </child>
+                                <child>
+                                    <object class="GtkScrolledWindow">
+                                        <property name="hscrollbar-policy">Automatic</property>
+                                        <property name="min-content-width">256</property>
+                                        <property name="hexpand">false</property>
+                                        <property name="vexpand">true</property>
+                                        <property name="propagate-natural-width">true</property>
+
+                                        <property name="child">
+                                            <object class="MediaLibraryUi" id="media_library">
+                                                <signal name="activate"
+                                                        handler="handle_library_activate"
+                                                        swapped="true"/>
+
+                                                <property name="vexpand">true</property>
+                                            </object>
+                                        </property>
+                                    </object>
+                                </child>
+                                <child>
+                                    <object class="GtkBox">
+                                        <property name="orientation">horizontal</property>
+                                        <child>
+                                            <object class="GtkDropDown" id="grouping_mode">
+                                                <signal name="notify::selected-item"
+                                                        handler="handle_grouping_mode_change"
+                                                        swapped="true"/>
+
+                                                <property name="hexpand">true</property>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkButton" id="refresh_button">
+                                                <signal name="clicked"
+                                                        handler="handle_refresh"
+                                                        swapped="true"/>
+
+                                                <property name="icon-name">view-refresh</property>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+                            </object>
+                        </child>
+                        <child type="end">
+                            <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+
+                                <child>
+                                    <object class="GtkScrolledWindow">
+                                        <property name="hscrollbar-policy">Automatic</property>
+                                        <property name="min_content_width">120</property>
+                                        <property name="hexpand">true</property>
+                                        <property name="vexpand">true</property>
+
+                                        <property name="child">
+                                            <object class="PlaylistUi" id="playlist">
+                                                <signal name="request_append_tracks"
+                                                        handler="handle_request_append_tracks"
+                                                        swapped="true"/>
+                                                <signal name="request_insert_tracks"
+                                                        handler="handle_request_insert_tracks"
+                                                        swapped="true"/>
+                                                <signal name="request_remove_tracks"
+                                                        handler="handle_request_remove_tracks"
+                                                        swapped="true"/>
+                                                <signal name="activate"
+                                                        handler="handle_playlist_activate"
+                                                        swapped="true"/>
+
+                                                <property name="playlist">
+                                                    <object class="GListStore">
+                                                        <property name="item-type">PlaylistItem</property>
+                                                    </object>
+                                                </property>
+                                            </object>
+                                        </property>
+                                    </object>
+                                </child>
+                                <child>
+                                    <object class="PlayerUi" id="player">
+                                        <signal name="next_track"
+                                                handler="handle_next_track"
+                                                swapped="true"/>
+                                        <signal name="play_pause"
+                                                handler="handle_play_pause"
+                                                swapped="true"/>
+                                        <signal name="previous_track"
+                                                handler="handle_previous_track"
+                                                swapped="true"/>
+
+                                        <property name="playback_state">
+                                            <object class="PlaybackState" id="playback">
+                                                <signal name="ended"
+                                                        handler="handle_ended"
+                                                        swapped="true"/>
+
+                                                <property name="volume">1.0</property>
+                                            </object>
+                                        </property>
+                                    </object>
+                                </child>
+                            </object>
+                        </child>
+                    </object>
+                </property>
+            </object>
+        </property>
+    </template>
+</interface>

@@ -1,0 +1,144 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-08 07:26+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/resources/window.ui:14 src/resources/window.ui:16
+#: src/resources/window.ui:16
+msgid "menu-playlist"
+msgstr "Lista odtwarzania"
+
+#: src/resources/window.ui:16 src/resources/window.ui:18
+#: src/resources/window.ui:18
+msgid "menu-remove-selected-from-playlist"
+msgstr "Usuń zaznaczone"
+
+#: src/resources/window.ui:22 src/resources/window.ui:24
+#: src/resources/window.ui:24
+msgid "menu-clear-playlist"
+msgstr "Opróżnij"
+
+#: src/resources/window.ui:27 src/resources/window.ui:29
+#: src/resources/window.ui:29
+msgid "menu-program"
+msgstr "Program"
+
+#: src/resources/window.ui:29 src/resources/window.ui:31
+#: src/resources/window.ui:31
+msgid "menu-config"
+msgstr "Opcje"
+
+#: src/resources/window.ui:33 src/resources/window.ui:35
+#: src/resources/window.ui:35
+msgid "menu-quit"
+msgstr "Zakończ"
+
+#: src/resources/preferences.ui:8 src/resources/preferences.ui:8
+msgid "settings-main"
+msgstr "Główne"
+
+#: src/resources/preferences.ui:14 src/resources/preferences.ui:14
+msgid "settings-media-path"
+msgstr "Ścieżka mediów"
+
+#: src/resources/preferences.ui:22 src/resources/preferences.ui:22
+msgid "settings-clear-database"
+msgstr "Wyczyść bazę danych"
+
+#: src/resources/preferences.ui:30 src/resources/preferences.ui:30
+msgid "settings-tray"
+msgstr "Tray"
+
+#: src/resources/preferences.ui:36 src/resources/preferences.ui:36
+msgid "settings-enable-tray"
+msgstr "Pokaż w zasobniku systemowym"
+
+#: src/resources/preferences.ui:37 src/resources/preferences.ui:37
+msgid "settings-requires-restart"
+msgstr "wymaga ponownego uruchomienia"
+
+#: src/resources/preferences.ui:44 src/resources/preferences.ui:44
+msgid "settings-hide-on-close"
+msgstr "Ukryj zamiast wyłączać"
+
+#: src/tray.rs:59 src/tray.rs:59
+msgid "tray-hide-show"
+msgstr "Pokaż/ukryj"
+
+#: src/tray.rs:67 src/tray.rs:67
+msgid "tray-exit"
+msgstr "Zakończ"
+
+#: src/media_library/grouping_mode.rs:44 src/media_library/grouping_mode.rs:62
+#: src/media_library/grouping_mode.rs:44 src/media_library/grouping_mode.rs:62
+msgid "none"
+msgstr "brak"
+
+#: src/media_library/grouping_mode.rs:45 src/media_library/grouping_mode.rs:63
+#: src/media_library/grouping_mode.rs:45 src/media_library/grouping_mode.rs:63
+msgid "album"
+msgstr "Album"
+
+#: src/media_library/grouping_mode.rs:46 src/media_library/grouping_mode.rs:64
+#: src/media_library/grouping_mode.rs:46 src/media_library/grouping_mode.rs:64
+msgid "artist-album"
+msgstr "Artysta / Album"
+
+#: src/media_library/grouping_mode.rs:47 src/media_library/grouping_mode.rs:65
+#: src/media_library/grouping_mode.rs:47 src/media_library/grouping_mode.rs:65
+msgid "artist-year-album"
+msgstr "Artysta / Rok/ Album"
+
+#: src/media_library/grouping_mode.rs:48 src/media_library/grouping_mode.rs:66
+#: src/media_library/grouping_mode.rs:48 src/media_library/grouping_mode.rs:66
+msgid "genre-album"
+msgstr "Gatunek / Album"
+
+#: src/media_library/grouping_mode.rs:49 src/media_library/grouping_mode.rs:67
+#: src/media_library/grouping_mode.rs:49 src/media_library/grouping_mode.rs:67
+msgid "genre-year-album"
+msgstr "Gatunek / Rok / Album"
+
+#: src/media_library/grouping_mode.rs:51 src/media_library/grouping_mode.rs:68
+#: src/media_library/grouping_mode.rs:51 src/media_library/grouping_mode.rs:68
+msgid "genre-artist-album"
+msgstr "Gatunek / Artysta / Album"
+
+#: src/media_library/grouping_mode.rs:54 src/media_library/grouping_mode.rs:69
+#: src/media_library/grouping_mode.rs:54 src/media_library/grouping_mode.rs:69
+msgid "year-album"
+msgstr "Rok / Album"
+
+#: src/playlist/ui.rs:194
+msgid "column-track"
+msgstr "#"
+
+#: src/playlist/ui.rs:195
+msgid "column-title"
+msgstr "Tytuł"
+
+#: src/playlist/ui.rs:196
+msgid "column-artists"
+msgstr "Artyści"
+
+#: src/playlist/ui.rs:197
+msgid "column-album"
+msgstr "Album"
+
+#: src/playlist/ui.rs:198
+msgid "column-duration"
+msgstr "Długość"

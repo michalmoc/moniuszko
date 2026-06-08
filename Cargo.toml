@@ -21,11 +21,9 @@ itertools = "0.14.0"
 musicbrainz_rs = { version = "0.13.0", features = ["sync"] }
 zbus = "5.15.0"
 async-channel = "2.5.0"
-fluent-zero = "0.1.4"
-sys-locale = "0.3.2"
-fluent-langneg = "0.14.2"
 ksni = { version = "0.3.4", default-features = false, features = ["async-io"] }
 image = "0.25.10"
+gettext-rs = { version = "0.7.7", features = ["gettext-system"] }
 
 [build-dependencies]
-fluent-zero-build = "0.1.4"
+glib-build-tools = "0.22.0"
