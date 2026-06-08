@@ -1,12 +1,10 @@
-use crate::database::{DatabasePtr, ObjectId, SearchResultPtr};
+use crate::database::{DatabasePtr, SearchResultPtr};
 use crate::media_library::GroupingModePtr;
 use crate::media_library::grouping_mode::Category;
 use crate::media_library::ui_item::MediaListItem;
-use gio::prelude::ListModelExt;
-use gtk4::glib::Object;
 use gtk4::prelude::{Cast, CastNone};
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
-use gtk4::{MultiSelection, TreeListModel, TreeListRow, Widget, glib};
+use gtk4::{MultiSelection, TreeListModel, Widget, glib};
 use std::cell::Ref;
 
 glib::wrapper! {
@@ -105,7 +103,7 @@ mod imp {
     use crate::media_library::GroupingModePtr;
     use crate::media_library::grouping_mode::Category;
     use crate::media_library::ui_item::MediaListItem;
-    use crate::playlist::{ObjectIds, PlaylistEntryUuids};
+    use crate::playlist::ObjectIds;
     use adw::glib;
     use adw::glib::Properties;
     use adw::glib::subclass::Signal;

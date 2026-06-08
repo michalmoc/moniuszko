@@ -1,8 +1,8 @@
 use crate::commands::Command;
 use crate::config::ConfigPtr;
 use crate::database::{DatabasePtr, ScannerPtr};
+use adw::glib;
 use adw::glib::{Object, WeakRef};
-use adw::{Window, glib};
 use async_channel::Sender;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
 
@@ -38,7 +38,7 @@ mod imp {
     use adw::subclass::prelude::{
         AdwDialogImpl, ObjectImpl, ObjectSubclass, PreferencesDialogImpl,
     };
-    use adw::{EntryRow, SwitchRow, Window, glib};
+    use adw::{EntryRow, SwitchRow, glib};
     use async_channel::Sender;
     use gio::glib::WeakRef;
     use gtk4::prelude::{EditableExt, GtkWindowExt, WidgetExt};

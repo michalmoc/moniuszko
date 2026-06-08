@@ -1,6 +1,5 @@
 use crate::database::ObjectId;
 use gettextrs::gettext;
-use std::borrow::Cow;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;

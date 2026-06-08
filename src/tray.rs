@@ -1,7 +1,7 @@
 use crate::commands::Command;
 use crate::constants::{APP_NAME, FANCY_APP_NAME};
 use async_channel::Sender;
-use fluent_zero::t;
+use gettextrs::gettext;
 use image::GenericImageView;
 use ksni::TrayMethods;
 use std::sync::LazyLock;
@@ -56,7 +56,7 @@ impl ksni::Tray for MyTray {
         use ksni::menu::*;
         vec![
             StandardItem {
-                label: t!("tray-hide-show").into(),
+                label: gettext("tray-hide-show").into(),
                 activate: Box::new(|t: &mut MyTray| {
                     t.commands.send_blocking(Command::HideShow).unwrap()
                 }),
@@ -64,7 +64,7 @@ impl ksni::Tray for MyTray {
             }
             .into(),
             StandardItem {
-                label: t!("tray-exit").into(),
+                label: gettext("tray-exit").into(),
                 icon_name: "application-exit".into(),
                 activate: Box::new(|t: &mut MyTray| {
                     t.commands.send_blocking(Command::Quit).unwrap()

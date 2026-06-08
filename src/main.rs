@@ -29,8 +29,6 @@ use std::fs::File;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
-include!(concat!(env!("OUT_DIR"), "/static_cache.rs"));
-
 pub fn set_global_locale_gettext() {
     setlocale(LocaleCategory::LcAll, "");
     bindtextdomain(

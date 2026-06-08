@@ -4,10 +4,10 @@ mod ui;
 mod ui_item;
 
 use crate::config::ConfigPtr;
-use crate::database::{Database, DatabasePtr, TrackId};
+use crate::database::{Database, TrackId};
 pub use dnd_item::ObjectIds;
 use gio::prelude::{ListModelExt, ListModelExtManual};
-use gtk4::prelude::{Cast, CastNone, StaticType};
+use gtk4::prelude::{Cast, CastNone};
 use std::fs;
 pub use ui::PlaylistUi;
 pub use ui_item::{PlaylistEntryUuid, PlaylistEntryUuids, PlaylistItem};

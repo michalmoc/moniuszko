@@ -2,7 +2,7 @@ use crate::playlist::ui_item::PlaylistEntryUuids;
 use crate::playlist::{ObjectIds, Playlist};
 use gtk4::Widget;
 use gtk4::glib;
-use gtk4::glib::{clone, closure_local};
+use gtk4::glib::closure_local;
 use gtk4::prelude::ObjectExt;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
 // TODO: create 'ui' module
@@ -55,7 +55,7 @@ mod imp {
     use crate::playlist::{ObjectIds, PlaylistItem};
     use adw::glib::Propagation;
     use adw::prelude::{Cast, ObjectExt};
-    use fluent_zero::t;
+    use gettextrs::gettext;
     use gio::prelude::ListModelExt;
     use gtk4::gdk::{Drag, DragAction, Key, ModifierType};
     use gtk4::glib::subclass::Signal;
@@ -191,11 +191,11 @@ mod imp {
         view.add_controller(drop_target);
         view.add_controller(shortcut_controller);
 
-        view.append_column(&Column::new_numeric("column-track", "position").build());
-        view.append_column(&Column::new_text("column-title", "name").build());
-        view.append_column(&Column::new_text("column-artists", "artists").build());
-        view.append_column(&Column::new_text("column-album", "album").build());
-        view.append_column(&Column::new_numeric("column-duration", "duration").build());
+        view.append_column(&Column::new_numeric(&gettext("column-track"), "position").build());
+        view.append_column(&Column::new_text(&gettext("column-title"), "name").build());
+        view.append_column(&Column::new_text(&gettext("column-artists"), "artists").build());
+        view.append_column(&Column::new_text(&gettext("column-album"), "album").build());
+        view.append_column(&Column::new_numeric(&gettext("column-duration"), "duration").build());
 
         playlist.connect_items_changed(clone!(
             #[weak]
@@ -238,7 +238,7 @@ mod imp {
             factory.connect_setup(move |_, item| Self::setup(item, self.align, &self.class));
             factory.connect_bind(move |_, item| Self::bind(item, &self.property));
 
-            let column = ColumnViewColumn::new(Some(&t!(&self.title)), Some(factory));
+            let column = ColumnViewColumn::new(Some(&gettext(&self.title)), Some(factory));
             column.set_resizable(true);
 
             column

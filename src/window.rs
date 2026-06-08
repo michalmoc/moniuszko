@@ -68,18 +68,17 @@ impl Window {
 mod imp {
     use crate::commands::Command;
     use crate::config::ConfigPtr;
-    use crate::database::{DatabasePtr, ObjectId, Scanner, ScannerPtr, SearchResultPtr};
+    use crate::database::{DatabasePtr, ObjectId, ScannerPtr, SearchResultPtr};
     use crate::media_library::{GroupingMode, GroupingModePtr, MediaLibraryUi};
     use crate::player::{PlaybackState, PlayerUi};
     use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuids, PlaylistItem, PlaylistUi};
     use crate::preferences::Preferences;
-    use adw::gtk;
     use adw::prelude::AdwDialogExt;
     use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
     use async_channel::Sender;
     use gtk4::gdk::{Key, ModifierType};
     use gtk4::glib::subclass::InitializingObject;
-    use gtk4::glib::{Object, Propagation, clone, closure_local};
+    use gtk4::glib::{Propagation, clone};
     use gtk4::prelude::{
         Cast, CastNone, EditableExt, GtkWindowExt, ObjectExt, StaticTypeExt, WidgetExt,
     };
