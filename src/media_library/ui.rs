@@ -24,15 +24,15 @@ impl MediaLibraryUi {
         self.imp().grouping_mode.replace(Some(grouping_mode));
     }
 
-    pub fn database(&self) -> Ref<'_, DatabasePtr> {
+    fn database(&self) -> Ref<'_, DatabasePtr> {
         Ref::map(self.imp().database.borrow(), |r| r.as_ref().unwrap())
     }
 
-    pub fn search_result(&self) -> Ref<'_, SearchResultPtr> {
+    fn search_result(&self) -> Ref<'_, SearchResultPtr> {
         Ref::map(self.imp().search_result.borrow(), |r| r.as_ref().unwrap())
     }
 
-    pub fn grouping_mode(&self) -> Ref<'_, GroupingModePtr> {
+    fn grouping_mode(&self) -> Ref<'_, GroupingModePtr> {
         Ref::map(self.imp().grouping_mode.borrow(), |r| r.as_ref().unwrap())
     }
 

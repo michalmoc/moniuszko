@@ -99,7 +99,6 @@ mod imp {
             }
         }
 
-        // TODO: add helper methids "connect"
         fn signals() -> &'static [Signal] {
             static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
             SIGNALS.get_or_init(|| {

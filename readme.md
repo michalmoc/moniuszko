@@ -4,9 +4,17 @@ Yet another music player. See [Vision](#vision).
 
 ## Status
 
-Usable but lacking major features. See [Roadmap](#roadmap).
+Usable but many features still planned. See [Roadmap](#roadmap).
 
 Warning: first scan may be slow, because of fetching data from musicbrainz.
+
+## Building
+
+for development:
+```cargo build```
+
+for install
+```LOCALE_DIR=/usr/share/locale cargo build --release```
 
 ## Vision
 

@@ -1,9 +1,5 @@
-use crate::playlist::ui_item::PlaylistEntryUuids;
-use crate::playlist::{ObjectIds, Playlist};
 use gtk4::Widget;
 use gtk4::glib;
-use gtk4::glib::closure_local;
-use gtk4::prelude::ObjectExt;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
 // TODO: create 'ui' module
 
@@ -14,36 +10,6 @@ glib::wrapper! {
 }
 
 impl PlaylistUi {
-    pub fn new(playlist: &Playlist) -> Self {
-        glib::Object::builder()
-            .property("playlist", playlist.inner())
-            .build()
-    }
-
-    pub fn connect_request_insert_tracks<F: Fn(ObjectIds, u32) + 'static>(&self, f: F) {
-        self.connect_closure(
-            "request-insert-tracks",
-            false,
-            closure_local!(move |_: Self, objs, pos| f(objs, pos)),
-        );
-    }
-
-    pub fn connect_request_append_tracks<F: Fn(ObjectIds) + 'static>(&self, f: F) {
-        self.connect_closure(
-            "request-append-tracks",
-            false,
-            closure_local!(move |_: Self, objs| f(objs)),
-        );
-    }
-
-    pub fn connect_request_remove_tracks<F: Fn(PlaylistEntryUuids) + 'static>(&self, f: F) {
-        self.connect_closure(
-            "request-remove-tracks",
-            false,
-            closure_local!(move |_: Self, uuids| f(uuids)),
-        );
-    }
-
     pub fn request_delete_selected(&self) {
         imp::on_delete_selected(self.imp().view.borrow().as_ref().unwrap(), self);
     }

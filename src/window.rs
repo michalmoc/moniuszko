@@ -7,7 +7,7 @@ use crate::playlist::Playlist;
 use adw::subclass::prelude::ObjectSubclassIsExt;
 use async_channel::Sender;
 use glib::Object;
-use gtk4::{gio, glib};
+use gtk4::{Button, gio, glib};
 
 glib::wrapper! {
     pub struct Window(ObjectSubclass<imp::Window>)
@@ -63,6 +63,10 @@ impl Window {
     pub fn media_library(&self) -> MediaLibraryUi {
         self.imp().media_library.get()
     }
+
+    pub fn refresh_button(&self) -> Button {
+        self.imp().refresh_button.get()
+    }
 }
 
 mod imp {
@@ -77,8 +81,8 @@ mod imp {
     use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
     use async_channel::Sender;
     use gtk4::gdk::{Key, ModifierType};
+    use gtk4::glib::Propagation;
     use gtk4::glib::subclass::InitializingObject;
-    use gtk4::glib::{Propagation, clone};
     use gtk4::prelude::{
         Cast, CastNone, EditableExt, GtkWindowExt, ObjectExt, StaticTypeExt, WidgetExt,
     };
@@ -96,9 +100,6 @@ mod imp {
         glib, template_callbacks,
     };
     use std::cell::RefCell;
-    use std::fs;
-    use std::fs::File;
-    use std::ops::Deref;
 
     #[derive(CompositeTemplate, Default)]
     #[template(resource = "/org/moniuszko/window.ui")]
@@ -303,47 +304,9 @@ mod imp {
 
         #[template_callback]
         fn handle_refresh(&self) {
-            glib::spawn_future_local(clone!(
-                #[weak(rename_to=this)]
-                self,
-                async move {
-                    if let Some(bound_data) = this.bound_data.borrow().as_ref() {
-                        this.refresh_button.set_sensitive(false);
-
-                        // TODO: move somehow to commands
-
-                        gio::spawn_blocking(clone!(
-                            #[weak(rename_to=config)]
-                            bound_data.config,
-                            #[weak(rename_to=scanner)]
-                            bound_data.scanner,
-                            #[weak(rename_to=database)]
-                            bound_data.database,
-                            move || {
-                                let config = config.read().unwrap();
-                                let mut scanner = scanner.write().unwrap();
-                                scanner.scan(&config.media_path, &config);
-                                let db = scanner.make_database();
-
-                                fs::create_dir_all(config.database_path().parent().unwrap())
-                                    .unwrap();
-                                let file = File::create(config.database_path()).unwrap();
-                                serde_json::to_writer(file, scanner.deref()).unwrap();
-
-                                *database.write().unwrap() = db;
-                            }
-                        ))
-                        .await
-                        .expect("Task needs to finish successfully.");
-
-                        this.command(Command::RepopulateMediaLibrary);
-                        this.command(Command::RefreshPlaylist);
-
-                        this.refresh_button.set_sensitive(true);
-                    }
-                }
-            ));
+            self.command(Command::RefreshMediaLibrary)
         }
+
         #[template_callback]
         fn handle_search_changed(&self) {
             if let Some(bound_data) = self.bound_data.borrow().as_ref() {

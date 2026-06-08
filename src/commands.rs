@@ -1,12 +1,17 @@
-use crate::database::{Database, DatabasePtr, ObjectId, TrackId};
-use crate::media_library::MediaLibraryUi;
+use crate::config::ConfigPtr;
+use crate::database::{Database, DatabasePtr, ObjectId, ScannerPtr, TrackId};
 use crate::player::PlaybackState;
 use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuid, PlaylistEntryUuids, PlaylistItem};
-use adw::gtk;
+use crate::window::Window;
+use adw::glib;
+use adw::glib::clone;
 use async_channel::Receiver;
 use gtk4::prelude::{GtkWindowExt, WidgetExt};
 use std::borrow::Borrow;
 use std::collections::HashSet;
+use std::fs;
+use std::fs::File;
+use std::ops::Deref;
 
 pub enum Command {
     Raise,
@@ -29,16 +34,20 @@ pub enum Command {
     InsertInPlaylist(ObjectIds, u32),
 
     RepopulateMediaLibrary,
+    RefreshMediaLibrary,
 }
 
 pub async fn process_commands(
     queue: Receiver<Command>,
-    window: gtk::Window,
-    playlist: Playlist,
-    playback_state: PlaybackState,
+    window: Window,
     database: DatabasePtr,
-    media_library: MediaLibraryUi,
+    config: ConfigPtr,
+    scanner: ScannerPtr,
 ) {
+    let playlist = window.playlist();
+    let playback_state = window.playback();
+    let media_library = window.media_library();
+
     loop {
         match queue.recv().await.unwrap() {
             Command::Raise => {
@@ -87,6 +96,12 @@ pub async fn process_commands(
                 insert_in_playlist(&playlist, &database.read().unwrap(), obj, pos)
             }
             Command::RepopulateMediaLibrary => media_library.repopulate(),
+            Command::RefreshMediaLibrary => refresh_library(
+                window.clone(),
+                database.clone(),
+                config.clone(),
+                scanner.clone(),
+            ),
         }
     }
 }
@@ -240,4 +255,43 @@ pub fn insert_in_playlist(
     for track in tracks.rev() {
         playlist.insert(pos, &PlaylistItem::new(track, &database));
     }
+}
+
+pub fn refresh_library(
+    window: Window,
+    database: DatabasePtr,
+    config: ConfigPtr,
+    scanner: ScannerPtr,
+) {
+    glib::spawn_future_local(async move {
+        window.refresh_button().set_sensitive(false);
+
+        gio::spawn_blocking(clone!(
+            #[weak]
+            scanner,
+            #[weak]
+            config,
+            #[weak]
+            database,
+            move || {
+                let mut scanner = scanner.write().unwrap();
+                scanner.scan(&config.read().unwrap().media_path, &config.read().unwrap());
+                let db = scanner.make_database();
+
+                fs::create_dir_all(config.read().unwrap().database_path().parent().unwrap())
+                    .unwrap();
+                let file = File::create(config.read().unwrap().database_path()).unwrap();
+                serde_json::to_writer(file, scanner.deref()).unwrap();
+
+                *database.write().unwrap() = db;
+            }
+        ))
+        .await
+        .expect("Task needs to finish successfully.");
+
+        window.media_library().repopulate();
+        refresh_playlist(&window.playlist(), &database.read().unwrap());
+
+        window.refresh_button().set_sensitive(true);
+    });
 }

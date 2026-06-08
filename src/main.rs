@@ -30,12 +30,11 @@ use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 pub fn set_global_locale_gettext() {
+    let locale_dir =
+        option_env!("LOCALE_DIR").unwrap_or(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/gettext"));
+
     setlocale(LocaleCategory::LcAll, "");
-    bindtextdomain(
-        "moniuszko",
-        env!("CARGO_MANIFEST_DIR").to_owned() + "/assets/gettext",
-    )
-    .expect("Unable to bind the text domain");
+    bindtextdomain("moniuszko", locale_dir).expect("Unable to bind the text domain");
 
     bind_textdomain_codeset("moniuszko", "UTF-8").expect("Unable to set text domain encoding");
     textdomain("moniuszko").expect("Unable to switch to the text domain");
@@ -101,21 +100,14 @@ fn build_ui(
     );
     window.present();
 
-    // TODO: present inside window, no need to pass
-    let playlist = window.playlist();
-    let playback = window.playback();
-    let media_library = window.media_library();
-
     glib::spawn_future_local(process_commands(
         receiver,
-        window.upcast(),
-        playlist,
-        playback.clone(),
+        window.clone(),
         database.clone(),
-        media_library,
+        config.clone(),
+        scanner.clone(),
     ));
-
-    glib::spawn_future_local(mpris(sender.clone(), playback, database.clone()));
+    glib::spawn_future_local(mpris(sender.clone(), window.playback(), database.clone()));
 
     if config.read().unwrap().tray_enabled {
         glib::spawn_future_local(run_tray(sender));
