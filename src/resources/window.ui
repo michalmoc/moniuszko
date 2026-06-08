@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface domain="moniuszko">
     <template class="MyGtkAppWindow" parent="AdwApplicationWindow">
+        <signal name="close_request" handler="handle_close_request" swapped="true"/>
+
         <property name="title">Moniuszko</property>
         <property name="content">
             <object class="AdwToolbarView">
@@ -15,23 +17,23 @@
                                             <item>
                                                 <attribute name="label" translatable="yes">menu-remove-selected-from-playlist</attribute>
                                                 <attribute
-                                                        name="action">app.current-playlist-delete-selected</attribute>
+                                                        name="action">current-playlist-delete-selected</attribute>
                                             </item>
                                             <item>
                                                 <attribute name="label"
                                                            translatable="yes">menu-clear-playlist</attribute>
-                                                <attribute name="action">app.current-playlist-clear</attribute>
+                                                <attribute name="action">current-playlist-clear</attribute>
                                             </item>
                                         </section>
                                         <section>
                                             <attribute name="label" translatable="yes">menu-program</attribute>
                                             <item>
                                                 <attribute name="label" translatable="yes">menu-config</attribute>
-                                                <attribute name="action">app.config</attribute>
+                                                <attribute name="action">config</attribute>
                                             </item>
                                             <item>
                                                 <attribute name="label" translatable="yes">menu-quit</attribute>
-                                                <attribute name="action">app.quit</attribute>
+                                                <attribute name="action">quit</attribute>
                                             </item>
                                         </section>
                                     </menu>

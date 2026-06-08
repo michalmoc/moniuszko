@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="moniuszko">
+    <template class="Preferences" parent="AdwPreferencesDialog">
+        <child>
+            <object class="AdwPreferencesPage">
+                <child>
+                    <object class="AdwPreferencesGroup">
+                        <property name="title" translatable="yes">settings-main</property>
+
+                        <child>
+                            <object class="AdwEntryRow" id="media_path">
+                                <signal name="apply" handler="handle_media_path" swapped="true"/>
+
+                                <property name="title" translatable="yes">settings-media-path</property>
+                                <property name="show_apply_button">true</property>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="AdwButtonRow">
+                                <signal name="activated" handler="handle_clear_database" swapped="true"/>
+
+                                <property name="title" translatable="yes">settings-clear-database</property>
+                                <property name="end-icon-name">view-refresh</property>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+                <child>
+                    <object class="AdwPreferencesGroup">
+                        <property name="title" translatable="yes">settings-tray</property>
+
+                        <child>
+                            <object class="AdwSwitchRow" id="enable_tray">
+                                <signal name="notify::active" handler="handle_enable_tray" swapped="true"/>
+
+                                <property name="title" translatable="yes">settings-enable-tray</property>
+                                <property name="subtitle" translatable="yes">settings-requires-restart</property>
+                            </object>
+                        </child>
+                        <child>
+                            <object class="AdwSwitchRow" id="hide_on_close">
+                                <signal name="notify::active" handler="handle_hide_on_close" swapped="true"/>
+
+                                <property name="title" translatable="yes">settings-hide-on-close</property>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+            </object>
+        </child>
+    </template>
+</interface>

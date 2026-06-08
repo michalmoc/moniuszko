@@ -72,11 +72,17 @@ mod imp {
     use crate::media_library::{GroupingMode, GroupingModePtr, MediaLibraryUi};
     use crate::player::{PlaybackState, PlayerUi};
     use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuids, PlaylistItem, PlaylistUi};
+    use crate::preferences::Preferences;
+    use adw::gtk;
+    use adw::prelude::AdwDialogExt;
     use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
     use async_channel::Sender;
+    use gtk4::gdk::{Key, ModifierType};
     use gtk4::glib::subclass::InitializingObject;
-    use gtk4::glib::{Object, clone, closure_local};
-    use gtk4::prelude::{CastNone, EditableExt, StaticTypeExt, WidgetExt};
+    use gtk4::glib::{Object, Propagation, clone, closure_local};
+    use gtk4::prelude::{
+        Cast, CastNone, EditableExt, GtkWindowExt, ObjectExt, StaticTypeExt, WidgetExt,
+    };
     use gtk4::subclass::prelude::ObjectSubclassExt;
     use gtk4::subclass::prelude::{
         ApplicationWindowImpl, CompositeTemplateClass, ObjectImpl, ObjectSubclass,
@@ -99,7 +105,7 @@ mod imp {
     #[template(resource = "/org/moniuszko/window.ui")]
     pub struct Window {
         #[template_child]
-        search_entry: TemplateChild<SearchEntry>,
+        pub search_entry: TemplateChild<SearchEntry>,
 
         #[template_child]
         pub grouping_mode: TemplateChild<DropDown>,
@@ -142,6 +148,34 @@ mod imp {
             PlaylistItem::ensure_type();
             klass.bind_template();
             klass.bind_template_callbacks();
+
+            klass.install_action("current-playlist-delete-selected", None, |window, _, _| {
+                window.imp().playlist.request_delete_selected()
+            });
+
+            klass.install_action("current-playlist-clear", None, |window, _, _| {
+                window.imp().command(Command::ClearPlaylist)
+            });
+
+            klass.install_action("config", None, |window, _, _| {
+                let pref = Preferences::new();
+                if let Some(bound_data) = window.imp().bound_data.borrow().as_ref() {
+                    pref.bind_data(
+                        bound_data.config.clone(),
+                        bound_data.database.clone(),
+                        bound_data.scanner.clone(),
+                        bound_data.commands.clone(),
+                        window.clone().upcast::<gtk4::Window>().downgrade(),
+                    );
+                }
+                pref.present(Some(window))
+            });
+
+            klass.install_action("quit", None, |window, _, _| {
+                window.imp().command(Command::Quit)
+            });
+
+            klass.add_binding_action(Key::Q, ModifierType::CONTROL_MASK, "quit");
         }
 
         fn instance_init(obj: &InitializingObject<Self>) {
@@ -322,6 +356,24 @@ mod imp {
                 bound_data.search_result.replace(result);
                 self.command(Command::RepopulateMediaLibrary)
             }
+        }
+
+        #[template_callback]
+        fn handle_close_request(&self) -> Propagation {
+            if let Some(bound_data) = self.bound_data.borrow().as_ref() {
+                let mut cfg = bound_data.config.write().unwrap();
+                let obj = self.obj();
+
+                cfg.window_width = obj.width();
+                cfg.window_height = obj.height();
+                cfg.window_maximized = obj.is_maximized();
+
+                if let Err(e) = cfg.save() {
+                    println!("Error saving config: {}", e);
+                }
+            }
+
+            Propagation::Proceed
         }
     }
 
