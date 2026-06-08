@@ -2,7 +2,7 @@ use gtk4::glib;
 use gtk4::glib::Object;
 
 mod imp {
-    use crate::playlist::ui_item::PlaylistEntryUuid;
+    use crate::data::playlist_entry_uuid::PlaylistEntryUuid;
     use gtk4::glib;
     use gtk4::glib::Properties;
     use gtk4::prelude::ObjectExt;

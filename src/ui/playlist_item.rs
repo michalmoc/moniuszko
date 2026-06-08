@@ -1,42 +1,13 @@
-use crate::database::{Database, TrackId};
+use crate::data::playlist_entry_uuid::PlaylistEntryUuid;
+use crate::data::track::TrackId;
+use crate::db::database::Database;
 use gtk4::glib;
 use gtk4::glib::Object;
-use std::borrow::Borrow;
-use std::collections::HashSet;
-use std::fmt::Display;
 use uuid::Uuid;
 
-// TODO: move to data
-
-#[derive(glib::Boxed, Copy, Clone, Eq, PartialEq, Default, Hash)]
-#[boxed_type(name = "PlaylistEntryUuid")]
-pub struct PlaylistEntryUuid(Uuid);
-
-impl Display for PlaylistEntryUuid {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[derive(glib::Boxed, Clone, Eq, PartialEq, Default)]
-#[boxed_type(name = "PlaylistEntryUuids")]
-pub struct PlaylistEntryUuids(HashSet<PlaylistEntryUuid>);
-
-impl PlaylistEntryUuids {
-    pub fn insert(&mut self, uuid: PlaylistEntryUuid) {
-        self.0.insert(uuid);
-    }
-}
-
-impl Borrow<HashSet<PlaylistEntryUuid>> for PlaylistEntryUuids {
-    fn borrow(&self) -> &HashSet<PlaylistEntryUuid> {
-        &self.0
-    }
-}
-
 mod imp {
-    use crate::database::TrackId;
-    use crate::playlist::ui_item::PlaylistEntryUuid;
+    use crate::data::playlist_entry_uuid::PlaylistEntryUuid;
+    use crate::data::track::TrackId;
     use gtk4::glib;
     use gtk4::glib::{Object, Properties};
     use gtk4::prelude::ObjectExt;
@@ -94,7 +65,7 @@ glib::wrapper! {
 impl PlaylistItem {
     pub fn new(track_id: TrackId, database: &Database) -> Self {
         let obj: Self = Object::builder()
-            .property("uuid", PlaylistEntryUuid(Uuid::new_v4()))
+            .property("uuid", PlaylistEntryUuid::new(Uuid::new_v4()))
             .property("stored_track", track_id)
             .property("is_playing", false)
             .build();

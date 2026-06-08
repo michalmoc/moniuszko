@@ -1,13 +1,13 @@
-use crate::player::PlaybackStatus;
+use crate::data::playback_status::PlaybackStatus;
 use gtk4::glib;
 use gtk4::glib::Object;
 use gtk4::prelude::MediaStreamExt;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
 
 mod imp {
-    use crate::player::playback_status::PlaybackStatus;
-    use crate::player::repeat_mode::RepeatMode;
-    use crate::playlist::PlaylistItem;
+    use crate::data::playback_status::PlaybackStatus;
+    use crate::data::repeat_mode::RepeatMode;
+    use crate::ui::playlist_item::PlaylistItem;
     use adw::glib::subclass::Signal;
     use gtk4::glib::{Object, Properties, clone};
     use gtk4::prelude::ObjectExt;

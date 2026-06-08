@@ -1,4 +1,4 @@
-use crate::player::playback_state::PlaybackState;
+use crate::control::playback_state::PlaybackState;
 use adw::glib::closure_local;
 use adw::prelude::ObjectExt;
 use gtk4::{Widget, glib};
@@ -30,7 +30,7 @@ impl PlayerUi {
 }
 
 mod imp {
-    use crate::player::PlaybackState;
+    use crate::control::playback_state::PlaybackState;
     use adw::ToggleGroup;
     use adw::glib::{Binding, Propagation};
     use adw::prelude::{Cast, ObjectExt};

@@ -1,7 +1,11 @@
 use crate::config::Config;
-use crate::database::musicbrainz::MusicBrainz;
-use crate::database::traverse_files::FilesDatabase;
-use crate::database::{Album, AlbumId, Artist, ArtistId, Database, Genre, Track, TrackId};
+use crate::data::album::{Album, AlbumId};
+use crate::data::artist::{Artist, ArtistId};
+use crate::data::genre::Genre;
+use crate::data::track::{Track, TrackId};
+use crate::db::database::Database;
+use crate::db::musicbrainz::MusicBrainz;
+use crate::db::traverse_files::FilesDatabase;
 use anyhow::anyhow;
 use itertools::Itertools;
 use lofty::file::{AudioFile, TaggedFileExt};
@@ -481,7 +485,7 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
 }
 
 mod scanner_serde {
-    use crate::database::scan::AlbumIdentification;
+    use super::AlbumIdentification;
     use serde::{Deserializer, Serializer};
     use ustr::Ustr;
 

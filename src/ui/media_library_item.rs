@@ -1,11 +1,15 @@
-use crate::database::{AlbumId, ArtistId, Database, ObjectId, TrackId};
+use crate::data::album::AlbumId;
+use crate::data::artist::ArtistId;
+use crate::data::object_id::ObjectId;
+use crate::data::track::TrackId;
+use crate::db::database::Database;
 use gio::subclass::prelude::ObjectSubclassIsExt;
 use gtk4::glib;
 use gtk4::glib::Object;
 use ustr::Ustr;
 
 mod imp {
-    use crate::database::ObjectId;
+    use crate::data::object_id::ObjectId;
     use gtk4::glib;
     use gtk4::glib::{Object, Properties};
     use gtk4::prelude::ObjectExt;
@@ -15,8 +19,8 @@ mod imp {
     use std::path::PathBuf;
 
     #[derive(Default, Properties)]
-    #[properties(wrapper_type = super::MediaListItem)]
-    pub struct MediaListItem {
+    #[properties(wrapper_type = super::MediaLibraryItem)]
+    pub struct MediaLibraryItem {
         pub filters: RefCell<Vec<ObjectId>>,
 
         #[property(get, set)]
@@ -30,23 +34,23 @@ mod imp {
     }
 
     #[glib::object_subclass]
-    impl ObjectSubclass for MediaListItem {
-        const NAME: &'static str = "MediaListItem";
-        type Type = super::MediaListItem;
+    impl ObjectSubclass for MediaLibraryItem {
+        const NAME: &'static str = "MediaLibraryItem";
+        type Type = super::MediaLibraryItem;
         type ParentType = Object;
     }
 
     #[glib::derived_properties]
-    impl ObjectImpl for MediaListItem {}
+    impl ObjectImpl for MediaLibraryItem {}
 }
 
 glib::wrapper! {
-    pub struct MediaListItem(ObjectSubclass<imp::MediaListItem>);
+    pub struct MediaLibraryItem(ObjectSubclass<imp::MediaLibraryItem>);
 }
 
-impl MediaListItem {
+impl MediaLibraryItem {
     pub fn new_track(track_id: TrackId, filters: Vec<ObjectId>, database: &Database) -> Self {
-        let obj: MediaListItem = Object::builder()
+        let obj: Self = Object::builder()
             .property("stored_object", ObjectId::from(track_id))
             .property("name", database[track_id].title.to_string())
             .build();
@@ -64,7 +68,7 @@ impl MediaListItem {
             String::from("[no album]")
         };
 
-        let obj: MediaListItem = Object::builder()
+        let obj: Self = Object::builder()
             .property("stored_object", ObjectId::from(album_id))
             .property("name", name)
             .property("image", &database[album_id].cover.to_string())
@@ -76,7 +80,7 @@ impl MediaListItem {
     }
 
     pub fn new_artist(artist_id: ArtistId, filters: Vec<ObjectId>, database: &Database) -> Self {
-        let obj: MediaListItem = Object::builder()
+        let obj: Self = Object::builder()
             .property("stored_object", ObjectId::from(artist_id))
             .property(
                 "name",
@@ -93,7 +97,7 @@ impl MediaListItem {
     }
 
     pub fn new_genre(genre: Option<Ustr>, filters: Vec<ObjectId>) -> Self {
-        let obj: MediaListItem = Object::builder()
+        let obj: Self = Object::builder()
             .property("stored_object", ObjectId::Genre(genre))
             .property(
                 "name",
@@ -109,7 +113,7 @@ impl MediaListItem {
     }
 
     pub fn new_year(year: Option<u16>, filters: Vec<ObjectId>) -> Self {
-        let obj: MediaListItem = Object::builder()
+        let obj: Self = Object::builder()
             .property("stored_object", ObjectId::from(year))
             .property(
                 "name",

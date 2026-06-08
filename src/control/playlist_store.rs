@@ -1,23 +1,17 @@
-mod box_with_playlist_entry;
-mod dnd_item;
-mod ui;
-mod ui_item;
-
 use crate::config::ConfigPtr;
-use crate::database::{Database, TrackId};
-pub use dnd_item::ObjectIds;
+use crate::data::track::TrackId;
+use crate::db::database::Database;
+use crate::ui::playlist_item::PlaylistItem;
 use gio::prelude::{ListModelExt, ListModelExtManual};
 use gtk4::prelude::{Cast, CastNone};
 use std::fs;
-pub use ui::PlaylistUi;
-pub use ui_item::{PlaylistEntryUuid, PlaylistEntryUuids, PlaylistItem};
 
 #[derive(Clone)]
-pub struct Playlist {
+pub struct PlaylistStore {
     list: gio::ListStore,
 }
 
-impl Playlist {
+impl PlaylistStore {
     pub fn wrap_and_load(store: gio::ListStore, database: &Database, config: ConfigPtr) -> Self {
         let path = config.read().unwrap().playlists_path();
 

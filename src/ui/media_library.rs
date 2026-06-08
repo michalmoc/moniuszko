@@ -1,7 +1,8 @@
-use crate::database::{DatabasePtr, SearchResultPtr};
-use crate::media_library::GroupingModePtr;
-use crate::media_library::grouping_mode::Category;
-use crate::media_library::ui_item::MediaListItem;
+use crate::data::category::Category;
+use crate::data::grouping_mode::GroupingModePtr;
+use crate::db::database::DatabasePtr;
+use crate::db::search_result::SearchResultPtr;
+use crate::ui::media_library_item::MediaLibraryItem;
 use gtk4::prelude::{Cast, CastNone};
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
 use gtk4::{MultiSelection, TreeListModel, Widget, glib};
@@ -62,35 +63,35 @@ impl MediaLibraryUi {
             Category::Track => {
                 for track_id in database.sorted_tracks() {
                     if search_result.has_track(track_id) {
-                        store.append(&MediaListItem::new_track(track_id, vec![], &database));
+                        store.append(&MediaLibraryItem::new_track(track_id, vec![], &database));
                     }
                 }
             }
             Category::Album => {
                 for album_id in database.sorted_albums() {
                     if search_result.has_album(album_id) {
-                        store.append(&MediaListItem::new_album(album_id, vec![], &database));
+                        store.append(&MediaLibraryItem::new_album(album_id, vec![], &database));
                     }
                 }
             }
             Category::Artist => {
                 for artist_id in database.sorted_artists() {
                     if search_result.has_artist(artist_id) {
-                        store.append(&MediaListItem::new_artist(artist_id, vec![], &database));
+                        store.append(&MediaLibraryItem::new_artist(artist_id, vec![], &database));
                     }
                 }
             }
             Category::Genre => {
                 for genre in database.sorted_genres() {
                     if search_result.has_genre(genre) {
-                        store.append(&MediaListItem::new_genre(genre, vec![]));
+                        store.append(&MediaLibraryItem::new_genre(genre, vec![]));
                     }
                 }
             }
             Category::Year => {
                 for year in database.sorted_years() {
                     if search_result.has_year(year) {
-                        store.append(&MediaListItem::new_year(year, vec![]));
+                        store.append(&MediaLibraryItem::new_year(year, vec![]));
                     }
                 }
             }
@@ -99,11 +100,12 @@ impl MediaLibraryUi {
 }
 
 mod imp {
-    use crate::database::{DatabasePtr, ObjectId, SearchResultPtr};
-    use crate::media_library::GroupingModePtr;
-    use crate::media_library::grouping_mode::Category;
-    use crate::media_library::ui_item::MediaListItem;
-    use crate::playlist::ObjectIds;
+    use crate::data::category::Category;
+    use crate::data::grouping_mode::GroupingModePtr;
+    use crate::data::object_id::{ObjectId, ObjectIds};
+    use crate::db::database::DatabasePtr;
+    use crate::db::search_result::SearchResultPtr;
+    use crate::ui::media_library_item::MediaLibraryItem;
     use adw::glib;
     use adw::glib::Properties;
     use adw::glib::subclass::Signal;
@@ -161,7 +163,7 @@ mod imp {
                     let store = sm.model().unwrap();
 
                     let row = store.item(p).and_downcast::<TreeListRow>().unwrap();
-                    let item = row.item().and_downcast::<MediaListItem>().unwrap();
+                    let item = row.item().and_downcast::<MediaLibraryItem>().unwrap();
                     obj.emit_by_name::<()>("activate", &[&item.stored_object()]);
                 }
             ));
@@ -193,7 +195,7 @@ mod imp {
         factory.connect_setup(tree_setup);
         factory.connect_bind(move |_, i| tree_bind(i));
 
-        let store = gio::ListStore::new::<MediaListItem>();
+        let store = gio::ListStore::new::<MediaLibraryItem>();
         let model = TreeListModel::new(store.clone(), false, false, move |i| create(i, &obj));
 
         let selection = MultiSelection::new(Some(model.clone()));
@@ -221,7 +223,7 @@ mod imp {
         let row = list_item.item().and_downcast::<TreeListRow>().unwrap();
         expander.set_list_row(Some(&row));
 
-        let dataobj = row.item().and_downcast::<MediaListItem>().unwrap();
+        let dataobj = row.item().and_downcast::<MediaLibraryItem>().unwrap();
 
         let label = Label::new(None);
         dataobj
@@ -261,7 +263,7 @@ mod imp {
     }
 
     fn create(item: &Object, obj: &super::MediaLibraryUi) -> Option<gio::ListModel> {
-        let item = item.downcast_ref::<MediaListItem>().unwrap();
+        let item = item.downcast_ref::<MediaLibraryItem>().unwrap();
         let grouping_mode = obj.grouping_mode().get();
 
         let current = item.stored_object();
@@ -271,7 +273,7 @@ mod imp {
         let mut filters = item.filters();
         filters.push(current);
 
-        let store = gio::ListStore::new::<MediaListItem>();
+        let store = gio::ListStore::new::<MediaLibraryItem>();
 
         let database_ptr = obj.database();
         let database = database_ptr.read().unwrap();
@@ -287,7 +289,11 @@ mod imp {
                     if database.track_matches_filter(track, &filters)
                         && search_result.has_track(track)
                     {
-                        store.append(&MediaListItem::new_track(track, filters.clone(), &database));
+                        store.append(&MediaLibraryItem::new_track(
+                            track,
+                            filters.clone(),
+                            &database,
+                        ));
                     }
                 }
 
@@ -298,7 +304,11 @@ mod imp {
                     if database.album_matches_filter(album, &filters)
                         && search_result.has_album(album)
                     {
-                        store.append(&MediaListItem::new_album(album, filters.clone(), &database));
+                        store.append(&MediaLibraryItem::new_album(
+                            album,
+                            filters.clone(),
+                            &database,
+                        ));
                     }
                 }
 
@@ -308,7 +318,7 @@ mod imp {
                 for year in database.sorted_years_of_artist(artist_id) {
                     // TODO: _matches_filter
                     if search_result.has_year(year) {
-                        store.append(&MediaListItem::new_year(year, filters.clone()));
+                        store.append(&MediaLibraryItem::new_year(year, filters.clone()));
                     }
                 }
 
@@ -319,7 +329,11 @@ mod imp {
                     if database.album_matches_filter(album, &filters)
                         && search_result.has_album(album)
                     {
-                        store.append(&MediaListItem::new_album(album, filters.clone(), &database));
+                        store.append(&MediaLibraryItem::new_album(
+                            album,
+                            filters.clone(),
+                            &database,
+                        ));
                     }
                 }
 
@@ -329,7 +343,7 @@ mod imp {
                 for year in database.sorted_years_of_genre(genre) {
                     // TODO: _matches_filter
                     if search_result.has_year(year) {
-                        store.append(&MediaListItem::new_year(year, filters.clone()));
+                        store.append(&MediaLibraryItem::new_year(year, filters.clone()));
                     }
                 }
 
@@ -339,7 +353,7 @@ mod imp {
                 for artist in database.sorted_artists_of_genre(genre) {
                     // TODO: _matches_filter
                     if search_result.has_artist(artist) {
-                        store.append(&MediaListItem::new_artist(
+                        store.append(&MediaLibraryItem::new_artist(
                             artist,
                             filters.clone(),
                             &database,
@@ -354,7 +368,11 @@ mod imp {
                     if database.album_matches_filter(album, &filters)
                         && search_result.has_album(album)
                     {
-                        store.append(&MediaListItem::new_album(album, filters.clone(), &database));
+                        store.append(&MediaLibraryItem::new_album(
+                            album,
+                            filters.clone(),
+                            &database,
+                        ));
                     }
                 }
 
@@ -397,7 +415,7 @@ mod imp {
                     .unwrap()
                     .downcast::<TreeListRow>()
                     .unwrap();
-                let dataobj = row.item().and_downcast::<MediaListItem>().unwrap();
+                let dataobj = row.item().and_downcast::<MediaLibraryItem>().unwrap();
                 object_ids.push(dataobj.stored_object());
             }
         }

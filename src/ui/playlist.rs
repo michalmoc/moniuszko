@@ -1,7 +1,6 @@
 use gtk4::Widget;
 use gtk4::glib;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
-// TODO: create 'ui' module
 
 glib::wrapper! {
     pub struct PlaylistUi(ObjectSubclass<imp::PlaylistUi>)
@@ -16,9 +15,10 @@ impl PlaylistUi {
 }
 
 mod imp {
-    use crate::playlist::box_with_playlist_entry::BoxWithPlaylistEntry;
-    use crate::playlist::ui_item::PlaylistEntryUuids;
-    use crate::playlist::{ObjectIds, PlaylistItem};
+    use crate::data::object_id::ObjectIds;
+    use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
+    use crate::ui::box_with_playlist_entry::BoxWithPlaylistEntry;
+    use crate::ui::playlist_item::PlaylistItem;
     use adw::glib::Propagation;
     use adw::prelude::{Cast, ObjectExt};
     use gettextrs::gettext;

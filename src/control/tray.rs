@@ -1,5 +1,5 @@
-use crate::commands::Command;
 use crate::constants::{APP_NAME, FANCY_APP_NAME};
+use crate::control::commands::Command;
 use async_channel::Sender;
 use gettextrs::gettext;
 use image::GenericImageView;

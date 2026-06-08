@@ -1,6 +1,7 @@
-use crate::commands::Command;
 use crate::config::ConfigPtr;
-use crate::database::{DatabasePtr, ScannerPtr};
+use crate::control::commands::Command;
+use crate::db::database::DatabasePtr;
+use crate::db::scan::ScannerPtr;
 use adw::glib;
 use adw::glib::{Object, WeakRef};
 use async_channel::Sender;
@@ -31,9 +32,10 @@ impl Preferences {
 }
 
 mod imp {
-    use crate::commands::Command;
     use crate::config::ConfigPtr;
-    use crate::database::{Database, DatabasePtr, Scanner, ScannerPtr};
+    use crate::control::commands::Command;
+    use crate::db::database::{Database, DatabasePtr};
+    use crate::db::scan::{Scanner, ScannerPtr};
     use adw::glib::subclass::InitializingObject;
     use adw::subclass::prelude::{
         AdwDialogImpl, ObjectImpl, ObjectSubclass, PreferencesDialogImpl,
@@ -133,6 +135,7 @@ mod imp {
             }
         }
 
+        // TODO: move to commands and then clean dependencies
         #[template_callback]
         fn handle_clear_database(&self) {
             if let Some(bound_data) = self.bound_data.borrow().as_ref() {

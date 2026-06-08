@@ -1,183 +1,22 @@
-mod musicbrainz;
-mod scan;
-mod traverse_files;
-
-use gtk4::glib;
+use crate::data::album::{Album, AlbumId};
+use crate::data::artist::{Artist, ArtistId};
+use crate::data::genre::Genre;
+use crate::data::object_id::ObjectId;
+use crate::data::track::{Track, TrackId};
+use crate::db::search_result::SearchResult;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Index;
-use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 use ustr::Ustr;
-use uuid::Uuid;
-
-pub use scan::{Scanner, ScannerPtr};
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Default, Serialize, Deserialize, glib::Boxed)]
-#[boxed_type(name = "TrackId")]
-pub struct TrackId(Uuid);
-
-impl TrackId {
-    pub fn new() -> Self {
-        TrackId(Uuid::now_v7())
-    }
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-pub struct AlbumId(Uuid);
-
-impl AlbumId {
-    pub fn new() -> Self {
-        AlbumId(Uuid::now_v7())
-    }
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-pub struct ArtistId(Uuid);
-
-impl ArtistId {
-    pub fn new() -> Self {
-        ArtistId(Uuid::now_v7())
-    }
-}
-
-#[derive(Default, Copy, Clone, Debug, glib::Boxed)]
-#[boxed_type(name = "ObjectId")]
-pub enum ObjectId {
-    #[default]
-    None,
-    TrackId(TrackId),
-    AlbumId(AlbumId),
-    ArtistId(ArtistId),
-    Genre(Option<Ustr>),
-    Year(Option<u16>),
-}
-
-impl From<TrackId> for ObjectId {
-    fn from(value: TrackId) -> Self {
-        Self::TrackId(value)
-    }
-}
-
-impl From<AlbumId> for ObjectId {
-    fn from(value: AlbumId) -> Self {
-        Self::AlbumId(value)
-    }
-}
-
-impl From<ArtistId> for ObjectId {
-    fn from(value: ArtistId) -> Self {
-        Self::ArtistId(value)
-    }
-}
-
-impl From<Option<u16>> for ObjectId {
-    fn from(value: Option<u16>) -> Self {
-        Self::Year(value)
-    }
-}
-
-#[derive(Clone)]
-pub struct Track {
-    pub path: PathBuf,
-
-    pub title: Ustr,
-    pub title_sort: Ustr,
-
-    pub album: AlbumId,
-    pub cd: Option<u32>,
-    pub position: Option<u32>,
-
-    pub artists: Option<Ustr>,
-    pub artist_ids: HashSet<ArtistId>,
-
-    pub duration: Duration,
-    pub year: Option<u16>,
-    pub genres: HashSet<Ustr>,
-}
-
-pub struct Album {
-    pub title: Ustr,
-    pub title_sort: Ustr,
-
-    pub year: Option<u16>, // TODO: allow multiple
-    unordered_tracks: Vec<TrackId>,
-    tracks: BTreeMap<(u32, u32), TrackId>,
-
-    pub cover: Ustr,
-}
-
-pub struct Artist {
-    pub uuid: Uuid,
-    pub name: Option<Ustr>,
-    pub sort: Option<Ustr>,
-    albums: HashSet<AlbumId>,
-}
-
-#[derive(Default)]
-pub struct Genre {
-    albums: HashSet<AlbumId>,
-    artists: HashSet<ArtistId>,
-}
-
-/// None means full set
-#[derive(Default)]
-pub struct SearchResult {
-    tracks: Option<HashSet<TrackId>>,
-    albums: Option<HashSet<AlbumId>>,
-    years: Option<HashSet<Option<u16>>>,
-    artists: Option<HashSet<ArtistId>>,
-    genres: Option<HashSet<Option<Ustr>>>,
-}
-
-impl SearchResult {
-    pub fn has_track(&self, id: TrackId) -> bool {
-        self.tracks
-            .as_ref()
-            .map(|container| container.contains(&id))
-            .unwrap_or(true)
-    }
-
-    pub fn has_album(&self, id: AlbumId) -> bool {
-        self.albums
-            .as_ref()
-            .map(|container| container.contains(&id))
-            .unwrap_or(true)
-    }
-
-    pub fn has_year(&self, id: Option<u16>) -> bool {
-        self.years
-            .as_ref()
-            .map(|container| container.contains(&id))
-            .unwrap_or(true)
-    }
-
-    pub fn has_artist(&self, id: ArtistId) -> bool {
-        self.artists
-            .as_ref()
-            .map(|container| container.contains(&id))
-            .unwrap_or(true)
-    }
-
-    pub fn has_genre(&self, id: Option<Ustr>) -> bool {
-        self.genres
-            .as_ref()
-            .map(|container| container.contains(&id))
-            .unwrap_or(true)
-    }
-}
 
 #[derive(Default)]
 pub struct Database {
-    tracks: HashMap<TrackId, Track>,
-    albums: HashMap<AlbumId, Album>,
-    years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
-    artists: HashMap<ArtistId, Artist>,
-    genres: BTreeMap<Option<Ustr>, Genre>,
+    pub tracks: HashMap<TrackId, Track>,
+    pub albums: HashMap<AlbumId, Album>,
+    pub years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
+    pub artists: HashMap<ArtistId, Artist>,
+    pub genres: BTreeMap<Option<Ustr>, Genre>,
 }
 
 impl Database {
@@ -447,7 +286,5 @@ impl Database {
         Default::default()
     }
 }
-
-pub type SearchResultPtr = Rc<RefCell<SearchResult>>;
 
 pub type DatabasePtr = Arc<RwLock<Database>>;

@@ -1,9 +1,12 @@
-use crate::commands::Command;
 use crate::config::{Config, ConfigPtr};
-use crate::database::{DatabasePtr, ScannerPtr, SearchResultPtr};
-use crate::media_library::{GroupingModePtr, MediaLibraryUi};
-use crate::player::PlaybackState;
-use crate::playlist::Playlist;
+use crate::control::commands::Command;
+use crate::control::playback_state::PlaybackState;
+use crate::control::playlist_store::PlaylistStore;
+use crate::data::grouping_mode::GroupingModePtr;
+use crate::db::database::DatabasePtr;
+use crate::db::scan::ScannerPtr;
+use crate::db::search_result::SearchResultPtr;
+use crate::ui::media_library::MediaLibraryUi;
 use adw::subclass::prelude::ObjectSubclassIsExt;
 use async_channel::Sender;
 use glib::Object;
@@ -46,7 +49,7 @@ impl Window {
         );
     }
 
-    pub fn playlist(&self) -> Playlist {
+    pub fn playlist(&self) -> PlaylistStore {
         self.imp()
             .bound_data
             .borrow()
@@ -70,22 +73,27 @@ impl Window {
 }
 
 mod imp {
-    use crate::commands::Command;
     use crate::config::ConfigPtr;
-    use crate::database::{DatabasePtr, ObjectId, ScannerPtr, SearchResultPtr};
-    use crate::media_library::{GroupingMode, GroupingModePtr, MediaLibraryUi};
-    use crate::player::{PlaybackState, PlayerUi};
-    use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuids, PlaylistItem, PlaylistUi};
-    use crate::preferences::Preferences;
+    use crate::control::commands::Command;
+    use crate::control::playback_state::PlaybackState;
+    use crate::control::playlist_store::PlaylistStore;
+    use crate::data::grouping_mode::{GroupingMode, GroupingModePtr};
+    use crate::data::object_id::{ObjectId, ObjectIds};
+    use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
+    use crate::db::database::DatabasePtr;
+    use crate::db::scan::ScannerPtr;
+    use crate::db::search_result::SearchResultPtr;
+    use crate::ui::media_library::MediaLibraryUi;
+    use crate::ui::player::PlayerUi;
+    use crate::ui::playlist::PlaylistUi;
+    use crate::ui::preferences::Preferences;
     use adw::prelude::AdwDialogExt;
     use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
     use async_channel::Sender;
     use gtk4::gdk::{Key, ModifierType};
     use gtk4::glib::Propagation;
     use gtk4::glib::subclass::InitializingObject;
-    use gtk4::prelude::{
-        Cast, CastNone, EditableExt, GtkWindowExt, ObjectExt, StaticTypeExt, WidgetExt,
-    };
+    use gtk4::prelude::{Cast, CastNone, EditableExt, GtkWindowExt, ObjectExt, WidgetExt};
     use gtk4::subclass::prelude::ObjectSubclassExt;
     use gtk4::subclass::prelude::{
         ApplicationWindowImpl, CompositeTemplateClass, ObjectImpl, ObjectSubclass,
@@ -130,7 +138,7 @@ mod imp {
 
     pub struct BoundData {
         pub commands: Sender<Command>,
-        pub playlist: Playlist,
+        pub playlist: PlaylistStore,
         pub grouping_mode: GroupingModePtr,
         pub database: DatabasePtr,
         pub config: ConfigPtr,
@@ -145,7 +153,6 @@ mod imp {
         type ParentType = adw::ApplicationWindow;
 
         fn class_init(klass: &mut Self::Class) {
-            PlaylistItem::ensure_type();
             klass.bind_template();
             klass.bind_template_callbacks();
 
@@ -210,7 +217,7 @@ mod imp {
         ) {
             let playlist = self.playlist.playlist().unwrap();
             let playlist =
-                Playlist::wrap_and_load(playlist, &database.read().unwrap(), config.clone());
+                PlaylistStore::wrap_and_load(playlist, &database.read().unwrap(), config.clone());
 
             self.media_library.bind_data(
                 database.clone(),

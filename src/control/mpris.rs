@@ -1,7 +1,9 @@
-use crate::commands::Command;
 use crate::constants::{APP_NAME, FANCY_APP_NAME, MPRIS_NAME};
-use crate::database::DatabasePtr;
-use crate::player::{PlaybackState, PlaybackStatus, RepeatMode};
+use crate::control::commands::Command;
+use crate::control::playback_state::PlaybackState;
+use crate::data::playback_status::PlaybackStatus;
+use crate::data::repeat_mode::RepeatMode;
+use crate::db::database::DatabasePtr;
 use async_channel::Sender;
 use gtk4::glib::clone;
 use itertools::Itertools;

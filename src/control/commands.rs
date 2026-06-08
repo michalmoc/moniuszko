@@ -1,8 +1,13 @@
 use crate::config::ConfigPtr;
-use crate::database::{Database, DatabasePtr, ObjectId, ScannerPtr, TrackId};
-use crate::player::PlaybackState;
-use crate::playlist::{ObjectIds, Playlist, PlaylistEntryUuid, PlaylistEntryUuids, PlaylistItem};
-use crate::window::Window;
+use crate::control::playback_state::PlaybackState;
+use crate::control::playlist_store::PlaylistStore;
+use crate::data::object_id::{ObjectId, ObjectIds};
+use crate::data::playlist_entry_uuid::{PlaylistEntryUuid, PlaylistEntryUuids};
+use crate::data::track::TrackId;
+use crate::db::database::{Database, DatabasePtr};
+use crate::db::scan::ScannerPtr;
+use crate::ui::playlist_item::PlaylistItem;
+use crate::ui::window::Window;
 use adw::glib;
 use adw::glib::clone;
 use async_channel::Receiver;
@@ -106,7 +111,7 @@ pub async fn process_commands(
     }
 }
 
-pub fn on_play_from_playlist(playlist: &Playlist, playback_state: &PlaybackState, pos: u32) {
+pub fn on_play_from_playlist(playlist: &PlaylistStore, playback_state: &PlaybackState, pos: u32) {
     if pos < playlist.len() {
         playback_state.set_current(playlist.get(pos));
         playback_state.set_playing(true);
@@ -139,7 +144,7 @@ fn on_seek(playback_state: &PlaybackState, offset: i64) {
     }
 }
 
-fn on_play_pause(playlist: &Playlist, playback_state: &PlaybackState) {
+fn on_play_pause(playlist: &PlaylistStore, playback_state: &PlaybackState) {
     if playback_state.current().is_none() {
         if playlist.len() > 0 {
             let item = playlist.get(0).unwrap();
@@ -151,7 +156,7 @@ fn on_play_pause(playlist: &Playlist, playback_state: &PlaybackState) {
     }
 }
 
-fn on_next(playlist: &Playlist, playback_state: &PlaybackState) {
+fn on_next(playlist: &PlaylistStore, playback_state: &PlaybackState) {
     if let Some(current) = playback_state.current() {
         if let Some(idx) = playlist.find(&current) {
             // playlist.n_items() != 0 because current present
@@ -167,7 +172,7 @@ fn on_next(playlist: &Playlist, playback_state: &PlaybackState) {
     }
 }
 
-fn on_previous(playlist: &Playlist, playback_state: &PlaybackState) {
+fn on_previous(playlist: &PlaylistStore, playback_state: &PlaybackState) {
     if let Some(current) = playback_state.current() {
         if let Some(idx) = playlist.find(&current) {
             if playback_state.progress() * 10 > playback_state.duration() {
@@ -187,17 +192,17 @@ fn on_previous(playlist: &Playlist, playback_state: &PlaybackState) {
     }
 }
 
-fn refresh_playlist(playlist: &Playlist, database: &Database) {
+fn refresh_playlist(playlist: &PlaylistStore, database: &Database) {
     for item in playlist.iter() {
         item.set_data(&database);
     }
 }
 
-fn clear_playlist(playlist: &Playlist) {
+fn clear_playlist(playlist: &PlaylistStore) {
     playlist.remove_all();
 }
 
-fn remove_from_playlist(playlist: &Playlist, to_remove: &HashSet<PlaylistEntryUuid>) {
+fn remove_from_playlist(playlist: &PlaylistStore, to_remove: &HashSet<PlaylistEntryUuid>) {
     playlist.retain(|item| !to_remove.contains(&item.uuid()));
 }
 
@@ -234,7 +239,7 @@ fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
     }
 }
 
-pub fn append_to_playlist(playlist: &Playlist, database: &Database, object_ids: ObjectIds) {
+pub fn append_to_playlist(playlist: &PlaylistStore, database: &Database, object_ids: ObjectIds) {
     for item in object_ids {
         for track in get_tracks(&database, item) {
             playlist.append(&PlaylistItem::new(track, &database));
@@ -243,7 +248,7 @@ pub fn append_to_playlist(playlist: &Playlist, database: &Database, object_ids: 
 }
 
 pub fn insert_in_playlist(
-    playlist: &Playlist,
+    playlist: &PlaylistStore,
     database: &Database,
     object_ids: ObjectIds,
     pos: u32,

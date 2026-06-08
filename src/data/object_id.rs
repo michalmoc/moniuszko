@@ -1,10 +1,48 @@
-use crate::database::ObjectId;
-use crate::playlist::ui_item::{PlaylistEntryUuid, PlaylistEntryUuids};
-use gio::glib;
+use crate::data::album::AlbumId;
+use crate::data::artist::ArtistId;
+use crate::data::playlist_entry_uuid::{PlaylistEntryUuid, PlaylistEntryUuids};
+use crate::data::track::TrackId;
+use adw::glib;
 use std::ops::{Deref, DerefMut};
+use ustr::Ustr;
 
-// TODO: move to data
+#[derive(Default, Copy, Clone, Debug, glib::Boxed)]
+#[boxed_type(name = "ObjectId")]
+pub enum ObjectId {
+    #[default]
+    None,
+    TrackId(TrackId),
+    AlbumId(AlbumId),
+    ArtistId(ArtistId),
+    Genre(Option<Ustr>),
+    Year(Option<u16>),
+}
 
+impl From<TrackId> for ObjectId {
+    fn from(value: TrackId) -> Self {
+        Self::TrackId(value)
+    }
+}
+
+impl From<AlbumId> for ObjectId {
+    fn from(value: AlbumId) -> Self {
+        Self::AlbumId(value)
+    }
+}
+
+impl From<ArtistId> for ObjectId {
+    fn from(value: ArtistId) -> Self {
+        Self::ArtistId(value)
+    }
+}
+
+impl From<Option<u16>> for ObjectId {
+    fn from(value: Option<u16>) -> Self {
+        Self::Year(value)
+    }
+}
+
+// TODO split into object ids and dnd item
 #[derive(Default, Clone, glib::Boxed)]
 #[boxed_type(name = "ObjectIds")]
 pub struct ObjectIds(Vec<ObjectId>, PlaylistEntryUuids);
