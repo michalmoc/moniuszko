@@ -93,7 +93,6 @@ fn build_ui(
         grouping_mode,
         config.clone(),
         sender.clone(),
-        scanner.clone(),
     );
     window.present();
 

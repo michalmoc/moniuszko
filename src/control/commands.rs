@@ -5,7 +5,7 @@ use crate::data::object_id::{ObjectId, ObjectIds};
 use crate::data::playlist_entry_uuid::{PlaylistEntryUuid, PlaylistEntryUuids};
 use crate::data::track::TrackId;
 use crate::db::database::{Database, DatabasePtr};
-use crate::db::scan::ScannerPtr;
+use crate::db::scan::{Scanner, ScannerPtr};
 use crate::ui::playlist_item::PlaylistItem;
 use crate::ui::window::Window;
 use adw::glib;
@@ -40,6 +40,7 @@ pub enum Command {
 
     RepopulateMediaLibrary,
     RefreshMediaLibrary,
+    ClearMediaLibrary,
 }
 
 pub async fn process_commands(
@@ -51,7 +52,6 @@ pub async fn process_commands(
 ) {
     let playlist = window.playlist();
     let playback_state = window.playback();
-    let media_library = window.media_library();
 
     loop {
         match queue.recv().await.unwrap() {
@@ -100,13 +100,16 @@ pub async fn process_commands(
             Command::InsertInPlaylist(obj, pos) => {
                 insert_in_playlist(&playlist, &database.read().unwrap(), obj, pos)
             }
-            Command::RepopulateMediaLibrary => media_library.repopulate(),
+            Command::RepopulateMediaLibrary => window.repopulate_media_library(),
             Command::RefreshMediaLibrary => refresh_library(
                 window.clone(),
                 database.clone(),
                 config.clone(),
                 scanner.clone(),
             ),
+            Command::ClearMediaLibrary => {
+                clear_media_library(&window, database.clone(), &playlist, scanner.clone())
+            }
         }
     }
 }
@@ -294,9 +297,21 @@ pub fn refresh_library(
         .await
         .expect("Task needs to finish successfully.");
 
-        window.media_library().repopulate();
+        window.repopulate_media_library();
         refresh_playlist(&window.playlist(), &database.read().unwrap());
 
         window.refresh_button().set_sensitive(true);
     });
+}
+
+pub fn clear_media_library(
+    window: &Window,
+    database: DatabasePtr,
+    playlist_store: &PlaylistStore,
+    scanner: ScannerPtr,
+) {
+    *database.write().unwrap() = Database::default();
+    *scanner.write().unwrap() = Scanner::default();
+    window.repopulate_media_library();
+    clear_playlist(&playlist_store)
 }

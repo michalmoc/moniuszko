@@ -1,6 +1,5 @@
 use crate::data::album::AlbumId;
 use crate::data::artist::ArtistId;
-use crate::data::playlist_entry_uuid::{PlaylistEntryUuid, PlaylistEntryUuids};
 use crate::data::track::TrackId;
 use adw::glib;
 use std::ops::{Deref, DerefMut};
@@ -42,10 +41,9 @@ impl From<Option<u16>> for ObjectId {
     }
 }
 
-// TODO split into object ids and dnd item
 #[derive(Default, Clone, glib::Boxed)]
 #[boxed_type(name = "ObjectIds")]
-pub struct ObjectIds(Vec<ObjectId>, PlaylistEntryUuids);
+pub struct ObjectIds(Vec<ObjectId>);
 
 impl ObjectIds {
     pub fn new() -> Self {
@@ -53,15 +51,7 @@ impl ObjectIds {
     }
 
     pub fn single(obj: ObjectId) -> Self {
-        ObjectIds(vec![obj], PlaylistEntryUuids::default())
-    }
-
-    pub fn mark_entry_for_removal(&mut self, uuid: PlaylistEntryUuid) {
-        self.1.insert(uuid);
-    }
-
-    pub fn entries_to_remove(self) -> PlaylistEntryUuids {
-        self.1
+        ObjectIds(vec![obj])
     }
 }
 

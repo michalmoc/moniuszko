@@ -4,9 +4,7 @@ use crate::control::playback_state::PlaybackState;
 use crate::control::playlist_store::PlaylistStore;
 use crate::data::grouping_mode::GroupingModePtr;
 use crate::db::database::DatabasePtr;
-use crate::db::scan::ScannerPtr;
 use crate::db::search_result::SearchResultPtr;
-use crate::ui::media_library::MediaLibraryUi;
 use adw::subclass::prelude::ObjectSubclassIsExt;
 use async_channel::Sender;
 use glib::Object;
@@ -37,16 +35,9 @@ impl Window {
         grouping_mode: GroupingModePtr,
         config: ConfigPtr,
         commands: Sender<Command>,
-        scanner: ScannerPtr,
     ) {
-        self.imp().bind_data(
-            database,
-            search_result,
-            grouping_mode,
-            config,
-            commands,
-            scanner,
-        );
+        self.imp()
+            .bind_data(database, search_result, grouping_mode, config, commands);
     }
 
     pub fn playlist(&self) -> PlaylistStore {
@@ -63,8 +54,8 @@ impl Window {
         self.imp().playback.get()
     }
 
-    pub fn media_library(&self) -> MediaLibraryUi {
-        self.imp().media_library.get()
+    pub fn repopulate_media_library(&self) {
+        self.imp().media_library.repopulate()
     }
 
     pub fn refresh_button(&self) -> Button {
@@ -81,7 +72,6 @@ mod imp {
     use crate::data::object_id::{ObjectId, ObjectIds};
     use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
     use crate::db::database::DatabasePtr;
-    use crate::db::scan::ScannerPtr;
     use crate::db::search_result::SearchResultPtr;
     use crate::ui::media_library::MediaLibraryUi;
     use crate::ui::player::PlayerUi;
@@ -142,7 +132,6 @@ mod imp {
         pub grouping_mode: GroupingModePtr,
         pub database: DatabasePtr,
         pub config: ConfigPtr,
-        pub scanner: ScannerPtr,
         pub search_result: SearchResultPtr,
     }
 
@@ -169,8 +158,6 @@ mod imp {
                 if let Some(bound_data) = window.imp().bound_data.borrow().as_ref() {
                     pref.bind_data(
                         bound_data.config.clone(),
-                        bound_data.database.clone(),
-                        bound_data.scanner.clone(),
                         bound_data.commands.clone(),
                         window.clone().upcast::<gtk4::Window>().downgrade(),
                     );
@@ -213,7 +200,6 @@ mod imp {
             grouping_mode: GroupingModePtr,
             config: ConfigPtr,
             commands: Sender<Command>,
-            scanner: ScannerPtr,
         ) {
             let playlist = self.playlist.playlist().unwrap();
             let playlist =
@@ -232,7 +218,6 @@ mod imp {
                 grouping_mode,
                 database,
                 config,
-                scanner,
                 search_result,
             }));
         }

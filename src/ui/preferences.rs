@@ -1,7 +1,5 @@
 use crate::config::ConfigPtr;
 use crate::control::commands::Command;
-use crate::db::database::DatabasePtr;
-use crate::db::scan::ScannerPtr;
 use adw::glib;
 use adw::glib::{Object, WeakRef};
 use async_channel::Sender;
@@ -21,21 +19,16 @@ impl Preferences {
     pub fn bind_data(
         &self,
         config: ConfigPtr,
-        database: DatabasePtr,
-        scanner: ScannerPtr,
         commands: Sender<Command>,
         window: WeakRef<gtk4::Window>,
     ) {
-        self.imp()
-            .bind_data(config, database, scanner, commands, window);
+        self.imp().bind_data(config, commands, window);
     }
 }
 
 mod imp {
     use crate::config::ConfigPtr;
     use crate::control::commands::Command;
-    use crate::db::database::{Database, DatabasePtr};
-    use crate::db::scan::{Scanner, ScannerPtr};
     use adw::glib::subclass::InitializingObject;
     use adw::subclass::prelude::{
         AdwDialogImpl, ObjectImpl, ObjectSubclass, PreferencesDialogImpl,
@@ -69,8 +62,6 @@ mod imp {
 
     pub struct BoundData {
         config: ConfigPtr,
-        database: DatabasePtr,
-        scanner: ScannerPtr,
         commands: Sender<Command>,
         window: WeakRef<gtk4::Window>,
     }
@@ -104,8 +95,6 @@ mod imp {
         pub fn bind_data(
             &self,
             config: ConfigPtr,
-            database: DatabasePtr,
-            scanner: ScannerPtr,
             commands: Sender<Command>,
             window: WeakRef<gtk4::Window>,
         ) {
@@ -121,8 +110,6 @@ mod imp {
 
             self.bound_data.replace(Some(BoundData {
                 config,
-                database,
-                scanner,
                 commands,
                 window,
             }));
@@ -135,19 +122,12 @@ mod imp {
             }
         }
 
-        // TODO: move to commands and then clean dependencies
         #[template_callback]
         fn handle_clear_database(&self) {
             if let Some(bound_data) = self.bound_data.borrow().as_ref() {
-                *bound_data.database.write().unwrap() = Database::default();
-                *bound_data.scanner.write().unwrap() = Scanner::default();
                 bound_data
                     .commands
-                    .send_blocking(Command::RepopulateMediaLibrary)
-                    .unwrap();
-                bound_data
-                    .commands
-                    .send_blocking(Command::ClearPlaylist)
+                    .send_blocking(Command::ClearMediaLibrary)
                     .unwrap();
             }
         }

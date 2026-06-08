@@ -18,6 +18,7 @@ mod imp {
     use crate::data::object_id::ObjectIds;
     use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
     use crate::ui::box_with_playlist_entry::BoxWithPlaylistEntry;
+    use crate::ui::dnd_item::DndItem;
     use crate::ui::playlist_item::PlaylistItem;
     use adw::glib::Propagation;
     use adw::prelude::{Cast, ObjectExt};
@@ -28,6 +29,7 @@ mod imp {
     use gtk4::glib::{Object, Properties, Value, clone};
     use gtk4::graphene::Point;
     use gtk4::prelude::ContentProviderExtManual;
+    use gtk4::prelude::StaticTypeExt;
     use gtk4::prelude::{
         BoxExt, CastNone, DragExt, SelectionModelExt, StaticType, ToValue, WidgetExt,
     };
@@ -57,6 +59,7 @@ mod imp {
         type ParentType = Widget;
 
         fn class_init(klass: &mut Self::Class) {
+            PlaylistItem::ensure_type();
             klass.set_layout_manager_type::<gtk4::BinLayout>();
             klass.set_css_name("playlist");
         }
@@ -118,7 +121,7 @@ mod imp {
         let selection = MultiSelection::new(Some(playlist.clone()));
         let view = ColumnView::new(Some(selection));
 
-        let drop_target = DropTarget::new(ObjectIds::static_type(), DragAction::all());
+        let drop_target = DropTarget::new(DndItem::static_type(), DragAction::all());
         drop_target.connect_drop(clone!(
             #[weak]
             this,
@@ -271,7 +274,8 @@ mod imp {
         column_view.grab_focus();
 
         let closest = find_closest(x, y, column_view.upcast_ref());
-        let obj_ids = value.get::<ObjectIds>().unwrap();
+        let drop = value.get::<DndItem>().unwrap();
+        let obj_ids = drop.objects();
         let sm = column_view.model().unwrap();
 
         if closest == column_view {
@@ -348,16 +352,16 @@ mod imp {
             }
         }
 
-        let mut object_ids = ObjectIds::new();
+        let mut drag = DndItem::new();
         for i in 0..sm.n_items() {
             if sm.is_selected(i) {
                 let row = sm.item(i).and_downcast::<PlaylistItem>().unwrap();
-                object_ids.push(row.stored_track().into());
-                object_ids.mark_entry_for_removal(row.uuid());
+                drag.push_object(row.stored_track().into());
+                drag.mark_entry_for_removal(row.uuid());
             }
         }
 
-        let value = Value::from(object_ids);
+        let value = Value::from(drag);
         let content = gdk::ContentProvider::for_value(&value);
 
         Some(content)
@@ -368,8 +372,8 @@ mod imp {
             return;
         }
 
-        if let Ok(content) = drag.content().value(ObjectIds::static_type()) {
-            let content = content.get_owned::<ObjectIds>().unwrap();
+        if let Ok(content) = drag.content().value(DndItem::static_type()) {
+            let content = content.get_owned::<DndItem>().unwrap();
             let to_remove = content.entries_to_remove();
 
             this.emit_by_name::<()>("request-remove-tracks", &[&to_remove]);
