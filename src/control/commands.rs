@@ -1,8 +1,10 @@
 use crate::config::ConfigPtr;
+use crate::control::history::History;
+use crate::control::modify_playlist_action::ModifyPlaylistAction;
 use crate::control::playback_state::PlaybackState;
 use crate::control::playlist_store::PlaylistStore;
 use crate::data::object_id::{ObjectId, ObjectIds};
-use crate::data::playlist_entry_uuid::{PlaylistEntryUuid, PlaylistEntryUuids};
+use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
 use crate::data::track::TrackId;
 use crate::db::database::{Database, DatabasePtr};
 use crate::db::scan::{Scanner, ScannerPtr};
@@ -12,11 +14,67 @@ use adw::glib;
 use adw::glib::clone;
 use async_channel::Receiver;
 use gtk4::prelude::{GtkWindowExt, WidgetExt};
-use std::borrow::Borrow;
-use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
 use std::ops::Deref;
+
+#[derive(Clone)]
+pub enum ModifyPlaylistCommand {
+    Clear,
+    Remove(PlaylistEntryUuids),
+    Add(ObjectIds, u32),
+    Move(PlaylistEntryUuids, u32),
+}
+
+impl ModifyPlaylistCommand {
+    fn interpret(self, playlist: &PlaylistStore, database: &Database) -> ModifyPlaylistAction {
+        match self {
+            ModifyPlaylistCommand::Clear => ModifyPlaylistAction::Remove(
+                playlist
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, item)| (idx as u32, item.stored_track()))
+                    .collect(),
+            ),
+            ModifyPlaylistCommand::Remove(entries) => ModifyPlaylistAction::Remove(
+                playlist
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, item)| {
+                        entries
+                            .contains(&item.uuid())
+                            .then_some((idx as u32, item.stored_track()))
+                    })
+                    .collect(),
+            ),
+            ModifyPlaylistCommand::Add(to_add, pos) => {
+                let pos = pos.min(playlist.len());
+
+                ModifyPlaylistAction::Insert(
+                    to_add
+                        .iter()
+                        .flat_map(|i| get_tracks(&database, *i))
+                        .enumerate()
+                        .map(|(idx, t)| (pos + idx as u32, t))
+                        .collect(),
+                )
+            }
+            ModifyPlaylistCommand::Move(to_move, pos) => {
+                let pos = pos.min(playlist.len());
+                ModifyPlaylistAction::Move(
+                    playlist
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, item)| {
+                            to_move.contains(&item.uuid()).then_some(idx as u32)
+                        })
+                        .collect(),
+                    pos,
+                )
+            }
+        }
+    }
+}
 
 pub enum Command {
     Raise,
@@ -33,10 +91,9 @@ pub enum Command {
     Seek(i64),
 
     RefreshPlaylist,
-    ClearPlaylist,
-    RemoveFromPlaylist(PlaylistEntryUuids),
-    AppendToPlaylist(ObjectIds),
-    InsertInPlaylist(ObjectIds, u32),
+    ModifyPlaylist(ModifyPlaylistCommand),
+    Undo,
+    Redo,
 
     RepopulateMediaLibrary,
     RefreshMediaLibrary,
@@ -50,6 +107,7 @@ pub async fn process_commands(
     config: ConfigPtr,
     scanner: ScannerPtr,
 ) {
+    let mut history = History::new();
     let playlist = window.playlist();
     let playback_state = window.playback();
 
@@ -90,15 +148,20 @@ pub async fn process_commands(
                 on_play_from_playlist(&playlist, &playback_state, pos);
             }
             Command::RefreshPlaylist => refresh_playlist(&playlist, &database.read().unwrap()),
-            Command::ClearPlaylist => clear_playlist(&playlist),
-            Command::RemoveFromPlaylist(to_remove) => {
-                remove_from_playlist(&playlist, to_remove.borrow())
+            Command::ModifyPlaylist(subcommand) => {
+                let action = subcommand.interpret(&playlist, &database.read().unwrap());
+                action.apply(&playlist, &database.read().unwrap());
+                history.push(action);
             }
-            Command::AppendToPlaylist(obj) => {
-                append_to_playlist(&playlist, &database.read().unwrap(), obj)
+            Command::Undo => {
+                if let Some(cmd) = history.undo() {
+                    cmd.unapply(&playlist, &database.read().unwrap())
+                }
             }
-            Command::InsertInPlaylist(obj, pos) => {
-                insert_in_playlist(&playlist, &database.read().unwrap(), obj, pos)
+            Command::Redo => {
+                if let Some(cmd) = history.redo() {
+                    cmd.apply(&playlist, &database.read().unwrap())
+                }
             }
             Command::RepopulateMediaLibrary => window.repopulate_media_library(),
             Command::RefreshMediaLibrary => refresh_library(
@@ -107,9 +170,13 @@ pub async fn process_commands(
                 config.clone(),
                 scanner.clone(),
             ),
-            Command::ClearMediaLibrary => {
-                clear_media_library(&window, database.clone(), &playlist, scanner.clone())
-            }
+            Command::ClearMediaLibrary => clear_media_library(
+                &window,
+                database.clone(),
+                &playlist,
+                scanner.clone(),
+                &mut history,
+            ),
         }
     }
 }
@@ -201,14 +268,6 @@ fn refresh_playlist(playlist: &PlaylistStore, database: &Database) {
     }
 }
 
-fn clear_playlist(playlist: &PlaylistStore) {
-    playlist.remove_all();
-}
-
-fn remove_from_playlist(playlist: &PlaylistStore, to_remove: &HashSet<PlaylistEntryUuid>) {
-    playlist.retain(|item| !to_remove.contains(&item.uuid()));
-}
-
 fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
     match item {
         ObjectId::None => {
@@ -239,29 +298,6 @@ fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
                 .flat_map(|a| database.sorted_tracks_of_album(a))
                 .collect()
         }
-    }
-}
-
-pub fn append_to_playlist(playlist: &PlaylistStore, database: &Database, object_ids: ObjectIds) {
-    for item in object_ids {
-        for track in get_tracks(&database, item) {
-            playlist.append(&PlaylistItem::new(track, &database));
-        }
-    }
-}
-
-pub fn insert_in_playlist(
-    playlist: &PlaylistStore,
-    database: &Database,
-    object_ids: ObjectIds,
-    pos: u32,
-) {
-    let tracks = object_ids
-        .into_iter()
-        .flat_map(|o| get_tracks(&database, o));
-
-    for track in tracks.rev() {
-        playlist.insert(pos, &PlaylistItem::new(track, &database));
     }
 }
 
@@ -309,9 +345,11 @@ pub fn clear_media_library(
     database: DatabasePtr,
     playlist_store: &PlaylistStore,
     scanner: ScannerPtr,
+    history: &mut History,
 ) {
     *database.write().unwrap() = Database::default();
     *scanner.write().unwrap() = Scanner::default();
     window.repopulate_media_library();
-    clear_playlist(&playlist_store)
+    playlist_store.remove_all();
+    history.clear();
 }

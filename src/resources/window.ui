@@ -15,6 +15,16 @@
                                         <section>
                                             <attribute name="label" translatable="yes">menu-playlist</attribute>
                                             <item>
+                                                <attribute name="label"
+                                                           translatable="yes">menu-undo</attribute>
+                                                <attribute name="action">current-playlist-undo</attribute>
+                                            </item>
+                                            <item>
+                                                <attribute name="label"
+                                                           translatable="yes">menu-redo</attribute>
+                                                <attribute name="action">current-playlist-redo</attribute>
+                                            </item>
+                                            <item>
                                                 <attribute name="label" translatable="yes">menu-remove-selected-from-playlist</attribute>
                                                 <attribute
                                                         name="action">current-playlist-delete-selected</attribute>
@@ -116,11 +126,11 @@
 
                                         <property name="child">
                                             <object class="PlaylistUi" id="playlist">
-                                                <signal name="request_append_tracks"
-                                                        handler="handle_request_append_tracks"
+                                                <signal name="request_add_tracks"
+                                                        handler="handle_request_add_tracks"
                                                         swapped="true"/>
-                                                <signal name="request_insert_tracks"
-                                                        handler="handle_request_insert_tracks"
+                                                <signal name="request_move_tracks"
+                                                        handler="handle_request_move_tracks"
                                                         swapped="true"/>
                                                 <signal name="request_remove_tracks"
                                                         handler="handle_request_remove_tracks"

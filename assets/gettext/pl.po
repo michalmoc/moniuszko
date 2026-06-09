@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-08 07:26+0200\n"
+"POT-Creation-Date: 2026-06-08 19:38+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,27 +23,27 @@ msgid "menu-playlist"
 msgstr "Lista odtwarzania"
 
 #: src/resources/window.ui:16 src/resources/window.ui:18
-#: src/resources/window.ui:18
+#: src/resources/window.ui:28
 msgid "menu-remove-selected-from-playlist"
 msgstr "Usuń zaznaczone"
 
 #: src/resources/window.ui:22 src/resources/window.ui:24
-#: src/resources/window.ui:24
+#: src/resources/window.ui:34
 msgid "menu-clear-playlist"
 msgstr "Opróżnij"
 
 #: src/resources/window.ui:27 src/resources/window.ui:29
-#: src/resources/window.ui:29
+#: src/resources/window.ui:39
 msgid "menu-program"
 msgstr "Program"
 
 #: src/resources/window.ui:29 src/resources/window.ui:31
-#: src/resources/window.ui:31
+#: src/resources/window.ui:41
 msgid "menu-config"
 msgstr "Opcje"
 
 #: src/resources/window.ui:33 src/resources/window.ui:35
-#: src/resources/window.ui:35
+#: src/resources/window.ui:45
 msgid "menu-quit"
 msgstr "Zakończ"
 
@@ -75,70 +75,78 @@ msgstr "wymaga ponownego uruchomienia"
 msgid "settings-hide-on-close"
 msgstr "Ukryj zamiast wyłączać"
 
-#: src/tray.rs:59 src/tray.rs:59
+#: src/tray.rs:59 src/control/tray.rs:59
 msgid "tray-hide-show"
 msgstr "Pokaż/ukryj"
 
-#: src/tray.rs:67 src/tray.rs:67
+#: src/tray.rs:67 src/control/tray.rs:67
 msgid "tray-exit"
 msgstr "Zakończ"
 
 #: src/media_library/grouping_mode.rs:44 src/media_library/grouping_mode.rs:62
-#: src/media_library/grouping_mode.rs:44 src/media_library/grouping_mode.rs:62
+#: src/data/grouping_mode.rs:22 src/data/grouping_mode.rs:40
 msgid "none"
 msgstr "brak"
 
 #: src/media_library/grouping_mode.rs:45 src/media_library/grouping_mode.rs:63
-#: src/media_library/grouping_mode.rs:45 src/media_library/grouping_mode.rs:63
+#: src/data/grouping_mode.rs:23 src/data/grouping_mode.rs:41
 msgid "album"
 msgstr "Album"
 
 #: src/media_library/grouping_mode.rs:46 src/media_library/grouping_mode.rs:64
-#: src/media_library/grouping_mode.rs:46 src/media_library/grouping_mode.rs:64
+#: src/data/grouping_mode.rs:24 src/data/grouping_mode.rs:42
 msgid "artist-album"
 msgstr "Artysta / Album"
 
 #: src/media_library/grouping_mode.rs:47 src/media_library/grouping_mode.rs:65
-#: src/media_library/grouping_mode.rs:47 src/media_library/grouping_mode.rs:65
+#: src/data/grouping_mode.rs:25 src/data/grouping_mode.rs:43
 msgid "artist-year-album"
 msgstr "Artysta / Rok/ Album"
 
 #: src/media_library/grouping_mode.rs:48 src/media_library/grouping_mode.rs:66
-#: src/media_library/grouping_mode.rs:48 src/media_library/grouping_mode.rs:66
+#: src/data/grouping_mode.rs:26 src/data/grouping_mode.rs:44
 msgid "genre-album"
 msgstr "Gatunek / Album"
 
 #: src/media_library/grouping_mode.rs:49 src/media_library/grouping_mode.rs:67
-#: src/media_library/grouping_mode.rs:49 src/media_library/grouping_mode.rs:67
+#: src/data/grouping_mode.rs:27 src/data/grouping_mode.rs:45
 msgid "genre-year-album"
 msgstr "Gatunek / Rok / Album"
 
 #: src/media_library/grouping_mode.rs:51 src/media_library/grouping_mode.rs:68
-#: src/media_library/grouping_mode.rs:51 src/media_library/grouping_mode.rs:68
+#: src/data/grouping_mode.rs:29 src/data/grouping_mode.rs:46
 msgid "genre-artist-album"
 msgstr "Gatunek / Artysta / Album"
 
 #: src/media_library/grouping_mode.rs:54 src/media_library/grouping_mode.rs:69
-#: src/media_library/grouping_mode.rs:54 src/media_library/grouping_mode.rs:69
+#: src/data/grouping_mode.rs:32 src/data/grouping_mode.rs:47
 msgid "year-album"
 msgstr "Rok / Album"
 
-#: src/playlist/ui.rs:194
+#: src/playlist/ui.rs:194 src/ui/playlist.rs:163
 msgid "column-track"
 msgstr "#"
 
-#: src/playlist/ui.rs:195
+#: src/playlist/ui.rs:195 src/ui/playlist.rs:164
 msgid "column-title"
 msgstr "Tytuł"
 
-#: src/playlist/ui.rs:196
+#: src/playlist/ui.rs:196 src/ui/playlist.rs:165
 msgid "column-artists"
 msgstr "Artyści"
 
-#: src/playlist/ui.rs:197
+#: src/playlist/ui.rs:197 src/ui/playlist.rs:166
 msgid "column-album"
 msgstr "Album"
 
-#: src/playlist/ui.rs:198
+#: src/playlist/ui.rs:198 src/ui/playlist.rs:167
 msgid "column-duration"
 msgstr "Długość"
+
+#: src/resources/window.ui:19
+msgid "menu-undo"
+msgstr "Cofnij"
+
+#: src/resources/window.ui:24
+msgid "menu-redo"
+msgstr "Powtórz"

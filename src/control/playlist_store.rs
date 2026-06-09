@@ -41,6 +41,12 @@ impl PlaylistStore {
         self.list.insert(pos, item);
     }
 
+    pub fn remove(&self, pos: u32) -> PlaylistItem {
+        let ret = self.list.item(pos).unwrap();
+        self.list.remove(pos);
+        ret.downcast().unwrap()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = PlaylistItem> + '_ {
         self.list.iter().map(|i| i.unwrap())
     }

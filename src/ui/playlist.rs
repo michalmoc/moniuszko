@@ -24,15 +24,12 @@ mod imp {
     use adw::prelude::{Cast, ObjectExt};
     use gettextrs::gettext;
     use gio::prelude::ListModelExt;
-    use gtk4::gdk::{Drag, DragAction, Key, ModifierType};
+    use gtk4::gdk::{DragAction, Key, ModifierType};
     use gtk4::glib::subclass::Signal;
     use gtk4::glib::{Object, Properties, Value, clone};
     use gtk4::graphene::Point;
-    use gtk4::prelude::ContentProviderExtManual;
     use gtk4::prelude::StaticTypeExt;
-    use gtk4::prelude::{
-        BoxExt, CastNone, DragExt, SelectionModelExt, StaticType, ToValue, WidgetExt,
-    };
+    use gtk4::prelude::{BoxExt, CastNone, SelectionModelExt, StaticType, ToValue, WidgetExt};
     use gtk4::prelude::{EventControllerExt, ListItemExt};
     use gtk4::subclass::prelude::*;
     use gtk4::{
@@ -101,11 +98,11 @@ mod imp {
                     Signal::builder("request-remove-tracks")
                         .param_types([PlaylistEntryUuids::static_type()])
                         .build(),
-                    Signal::builder("request-append-tracks")
-                        .param_types([ObjectIds::static_type()])
-                        .build(),
-                    Signal::builder("request-insert-tracks")
+                    Signal::builder("request-add-tracks")
                         .param_types([ObjectIds::static_type(), u32::static_type()])
+                        .build(),
+                    Signal::builder("request-move-tracks")
+                        .param_types([PlaylistEntryUuids::static_type(), u32::static_type()])
                         .build(),
                     Signal::builder("activate")
                         .param_types([u32::static_type()])
@@ -132,12 +129,6 @@ mod imp {
         let drag_source = DragSource::new();
         drag_source.set_actions(DragAction::MOVE);
         drag_source.connect_prepare(prepare_drag);
-        drag_source.connect_drag_end(clone!(
-            #[weak]
-            this,
-            #[upgrade_or_default]
-            move |_, d, v| drag_end(d, v, &this)
-        ));
 
         let shortcut_controller = ShortcutController::new();
         shortcut_controller.add_shortcut(
@@ -169,7 +160,17 @@ mod imp {
         playlist.connect_items_changed(clone!(
             #[weak]
             view,
-            move |_, pos, _, _| view.scroll_to(pos, None, ListScrollFlags::FOCUS, None)
+            move |_, pos, _, _| {
+                let len = view.model().unwrap().n_items();
+                let pos = if len == 0 {
+                    return;
+                } else if len <= pos {
+                    len - 1
+                } else {
+                    pos
+                };
+                view.scroll_to(pos, None, ListScrollFlags::FOCUS, None)
+            }
         ));
 
         view
@@ -274,24 +275,32 @@ mod imp {
         column_view.grab_focus();
 
         let closest = find_closest(x, y, column_view.upcast_ref());
-        let drop = value.get::<DndItem>().unwrap();
-        let obj_ids = drop.objects();
         let sm = column_view.model().unwrap();
 
-        if closest == column_view {
-            this.emit_by_name::<()>("request-append-tracks", &[&obj_ids]);
+        let index = if closest == column_view {
+            u32::MAX
         } else if closest.type_().name() == "GtkColumnViewRowWidget" {
             let Some(index) = find_index(&sm, &closest) else {
                 return false;
             };
 
             if is_in_top_half(y, &closest) {
-                this.emit_by_name::<()>("request-insert-tracks", &[&obj_ids, &index]);
+                index
             } else {
-                this.emit_by_name::<()>("request-insert-tracks", &[&obj_ids, &(index + 1)]);
+                index + 1
             }
         } else {
-            println!("unknown type {}", closest.type_())
+            println!("unknown type {}", closest.type_());
+            return false;
+        };
+
+        match value.get::<DndItem>().unwrap() {
+            DndItem::Add(to_add) => {
+                this.emit_by_name::<()>("request-add-tracks", &[&to_add, &index]);
+            }
+            DndItem::Move(to_move) => {
+                this.emit_by_name::<()>("request-move-tracks", &[&to_move, &index]);
+            }
         }
 
         true
@@ -352,32 +361,18 @@ mod imp {
             }
         }
 
-        let mut drag = DndItem::new();
+        let mut drag = PlaylistEntryUuids::default();
         for i in 0..sm.n_items() {
             if sm.is_selected(i) {
                 let row = sm.item(i).and_downcast::<PlaylistItem>().unwrap();
-                drag.push_object(row.stored_track().into());
-                drag.mark_entry_for_removal(row.uuid());
+                drag.insert(row.uuid());
             }
         }
 
-        let value = Value::from(drag);
+        let value = Value::from(DndItem::Move(drag));
         let content = gdk::ContentProvider::for_value(&value);
 
         Some(content)
-    }
-
-    fn drag_end(drag: &Drag, remove: bool, this: &super::PlaylistUi) {
-        if !remove {
-            return;
-        }
-
-        if let Ok(content) = drag.content().value(DndItem::static_type()) {
-            let content = content.get_owned::<DndItem>().unwrap();
-            let to_remove = content.entries_to_remove();
-
-            this.emit_by_name::<()>("request-remove-tracks", &[&to_remove]);
-        }
     }
 
     pub fn on_delete_selected(widget: &ColumnView, this: &super::PlaylistUi) {

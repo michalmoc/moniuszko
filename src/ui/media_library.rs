@@ -102,7 +102,7 @@ impl MediaLibraryUi {
 mod imp {
     use crate::data::category::Category;
     use crate::data::grouping_mode::GroupingModePtr;
-    use crate::data::object_id::ObjectId;
+    use crate::data::object_id::{ObjectId, ObjectIds};
     use crate::db::database::DatabasePtr;
     use crate::db::search_result::SearchResultPtr;
     use crate::ui::dnd_item::DndItem;
@@ -408,7 +408,7 @@ mod imp {
             }
         }
 
-        let mut drop = DndItem::new();
+        let mut drop = ObjectIds::new();
         for i in 0..selection.n_items() {
             if selection.is_selected(i) {
                 let row = selection
@@ -417,11 +417,11 @@ mod imp {
                     .downcast::<TreeListRow>()
                     .unwrap();
                 let dataobj = row.item().and_downcast::<MediaLibraryItem>().unwrap();
-                drop.push_object(dataobj.stored_object());
+                drop.push(dataobj.stored_object());
             }
         }
 
-        let value = Value::from(drop);
+        let value = Value::from(DndItem::Add(drop));
         let content = gdk::ContentProvider::for_value(&value);
         Some(content)
     }

@@ -28,6 +28,10 @@ impl PlaylistEntryUuids {
     pub fn insert(&mut self, uuid: PlaylistEntryUuid) {
         self.0.insert(uuid);
     }
+
+    pub fn contains(&self, uuid: &PlaylistEntryUuid) -> bool {
+        self.0.contains(uuid)
+    }
 }
 
 impl Borrow<HashSet<PlaylistEntryUuid>> for PlaylistEntryUuids {

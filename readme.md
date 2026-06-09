@@ -35,15 +35,14 @@ Why?
 
 for 1.2:
 
-- undo/redo playlist changes
 - random modes
 - separate library for audiobooks
+- panel with details of current piece (including lyrics)
 
 for 1.3:
 
 - many playlists
 - save/load playlist
-- panel with details of current piece (including lyrics)
 - save last timestamp in audiobooks
 
 other:

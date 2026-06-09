@@ -65,7 +65,7 @@ impl Window {
 
 mod imp {
     use crate::config::ConfigPtr;
-    use crate::control::commands::Command;
+    use crate::control::commands::{Command, ModifyPlaylistCommand};
     use crate::control::playback_state::PlaybackState;
     use crate::control::playlist_store::PlaylistStore;
     use crate::data::grouping_mode::{GroupingMode, GroupingModePtr};
@@ -150,7 +150,9 @@ mod imp {
             });
 
             klass.install_action("current-playlist-clear", None, |window, _, _| {
-                window.imp().command(Command::ClearPlaylist)
+                window
+                    .imp()
+                    .command(Command::ModifyPlaylist(ModifyPlaylistCommand::Clear))
             });
 
             klass.install_action("config", None, |window, _, _| {
@@ -169,7 +171,21 @@ mod imp {
                 window.imp().command(Command::Quit)
             });
 
+            klass.install_action("current-playlist-undo", None, |window, _, _| {
+                window.imp().command(Command::Undo)
+            });
+
+            klass.install_action("current-playlist-redo", None, |window, _, _| {
+                window.imp().command(Command::Redo)
+            });
+
             klass.add_binding_action(Key::Q, ModifierType::CONTROL_MASK, "quit");
+            klass.add_binding_action(Key::Z, ModifierType::CONTROL_MASK, "current-playlist-undo");
+            klass.add_binding_action(
+                Key::Z,
+                ModifierType::CONTROL_MASK | ModifierType::SHIFT_MASK,
+                "current-playlist-redo",
+            );
         }
 
         fn instance_init(obj: &InitializingObject<Self>) {
@@ -234,18 +250,24 @@ mod imp {
         }
 
         #[template_callback]
-        fn handle_request_append_tracks(&self, objs: ObjectIds) {
-            self.command(Command::AppendToPlaylist(objs))
+        fn handle_request_add_tracks(&self, objs: ObjectIds, pos: u32) {
+            self.command(Command::ModifyPlaylist(ModifyPlaylistCommand::Add(
+                objs, pos,
+            )))
         }
 
         #[template_callback]
-        fn handle_request_insert_tracks(&self, objs: ObjectIds, pos: u32) {
-            self.command(Command::InsertInPlaylist(objs, pos))
+        fn handle_request_move_tracks(&self, entries: PlaylistEntryUuids, pos: u32) {
+            self.command(Command::ModifyPlaylist(ModifyPlaylistCommand::Move(
+                entries, pos,
+            )))
         }
 
         #[template_callback]
         fn handle_request_remove_tracks(&self, uuids: PlaylistEntryUuids) {
-            self.command(Command::RemoveFromPlaylist(uuids))
+            self.command(Command::ModifyPlaylist(ModifyPlaylistCommand::Remove(
+                uuids,
+            )))
         }
 
         #[template_callback]
@@ -275,7 +297,10 @@ mod imp {
 
         #[template_callback]
         fn handle_library_activate(&self, obj: ObjectId) {
-            self.command(Command::AppendToPlaylist(ObjectIds::single(obj)))
+            self.command(Command::ModifyPlaylist(ModifyPlaylistCommand::Add(
+                ObjectIds::single(obj),
+                u32::MAX,
+            )))
         }
 
         #[template_callback]
