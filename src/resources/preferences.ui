@@ -16,6 +16,21 @@
                             </object>
                         </child>
                         <child>
+                            <object class="AdwComboRow" id="random_mode">
+                                <signal name="notify::selected" handler="handle_random_mode" swapped="true"/>
+
+                                <property name="title" translatable="yes">settings-random-mode</property>
+                                <property name="model">
+                                    <object class="GtkStringList">
+                                        <items>
+                                            <item translatable="yes">setting-true-random</item>
+                                            <item translatable="yes">setting-permutation</item>
+                                        </items>
+                                    </object>
+                                  </property>
+                            </object>
+                        </child>
+                        <child>
                             <object class="AdwButtonRow">
                                 <signal name="activated" handler="handle_clear_database" swapped="true"/>
 

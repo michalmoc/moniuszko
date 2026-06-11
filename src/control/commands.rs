@@ -1,8 +1,9 @@
-use crate::config::ConfigPtr;
-use crate::control::history::History;
+use crate::config::{Config, ConfigPtr, RandomMode};
+use crate::control::commands_history::CommandsHistory;
 use crate::control::modify_playlist_action::ModifyPlaylistAction;
 use crate::control::playback_state::PlaybackState;
 use crate::control::playlist_store::PlaylistStore;
+use crate::control::random_data::RandomData;
 use crate::data::object_id::{ObjectId, ObjectIds};
 use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
 use crate::data::track::TrackId;
@@ -98,6 +99,8 @@ pub enum Command {
     RepopulateMediaLibrary,
     RefreshMediaLibrary,
     ClearMediaLibrary,
+
+    ResetRandomData,
 }
 
 pub async fn process_commands(
@@ -107,9 +110,12 @@ pub async fn process_commands(
     config: ConfigPtr,
     scanner: ScannerPtr,
 ) {
-    let mut history = History::new();
     let playlist = window.playlist();
     let playback_state = window.playback();
+
+    let mut history = CommandsHistory::new();
+    let mut random_data = RandomData::sattolo(playlist.len());
+    reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
 
     loop {
         match queue.recv().await.unwrap() {
@@ -124,7 +130,7 @@ pub async fn process_commands(
                 window.set_visible(!window.is_visible());
             }
             Command::Next => {
-                on_next(&playlist, &playback_state);
+                on_next(&playlist, &playback_state, &mut random_data);
             }
             Command::PlayPause => {
                 on_play_pause(&playlist, &playback_state);
@@ -139,7 +145,7 @@ pub async fn process_commands(
                 on_play(&playback_state);
             }
             Command::Previous => {
-                on_previous(&playlist, &playback_state);
+                on_previous(&playlist, &playback_state, &mut random_data);
             }
             Command::Seek(pos) => {
                 on_seek(&playback_state, pos);
@@ -152,15 +158,18 @@ pub async fn process_commands(
                 let action = subcommand.interpret(&playlist, &database.read().unwrap());
                 action.apply(&playlist, &database.read().unwrap());
                 history.push(action);
+                reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
             }
             Command::Undo => {
                 if let Some(cmd) = history.undo() {
-                    cmd.unapply(&playlist, &database.read().unwrap())
+                    cmd.unapply(&playlist, &database.read().unwrap());
+                    reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
                 }
             }
             Command::Redo => {
                 if let Some(cmd) = history.redo() {
-                    cmd.apply(&playlist, &database.read().unwrap())
+                    cmd.apply(&playlist, &database.read().unwrap());
+                    reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
                 }
             }
             Command::RepopulateMediaLibrary => window.repopulate_media_library(),
@@ -170,14 +179,28 @@ pub async fn process_commands(
                 config.clone(),
                 scanner.clone(),
             ),
-            Command::ClearMediaLibrary => clear_media_library(
-                &window,
-                database.clone(),
-                &playlist,
-                scanner.clone(),
-                &mut history,
-            ),
+            Command::ClearMediaLibrary => {
+                clear_media_library(
+                    &window,
+                    database.clone(),
+                    &playlist,
+                    scanner.clone(),
+                    &mut history,
+                );
+
+                reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
+            }
+            Command::ResetRandomData => {
+                reset_random_data(&mut random_data, &config.read().unwrap(), &playlist)
+            }
         }
+    }
+}
+
+fn reset_random_data(data: &mut RandomData, config: &Config, playlist: &PlaylistStore) {
+    *data = match config.random_mode {
+        RandomMode::TrueRandom => RandomData::pcg(playlist.len()),
+        RandomMode::Permutation => RandomData::sattolo(playlist.len()),
     }
 }
 
@@ -226,11 +249,11 @@ fn on_play_pause(playlist: &PlaylistStore, playback_state: &PlaybackState) {
     }
 }
 
-fn on_next(playlist: &PlaylistStore, playback_state: &PlaybackState) {
+fn on_next(playlist: &PlaylistStore, playback_state: &PlaybackState, rng: &mut RandomData) {
     if let Some(current) = playback_state.current() {
         if let Some(idx) = playlist.find(&current) {
             // playlist.n_items() != 0 because current present
-            let next = playback_state.repeat_mode().next(idx, playlist.len());
+            let next = playback_state.repeat_mode().next(idx, playlist.len(), rng);
             playback_state.set_current(playlist.get(next));
             playback_state.set_playing(true);
         } else {
@@ -242,14 +265,16 @@ fn on_next(playlist: &PlaylistStore, playback_state: &PlaybackState) {
     }
 }
 
-fn on_previous(playlist: &PlaylistStore, playback_state: &PlaybackState) {
+fn on_previous(playlist: &PlaylistStore, playback_state: &PlaybackState, rng: &mut RandomData) {
     if let Some(current) = playback_state.current() {
         if let Some(idx) = playlist.find(&current) {
             if playback_state.progress() * 10 > playback_state.duration() {
                 playback_state.seek(0);
             } else {
                 // playlist.n_items() != 0 because current present
-                let next = playback_state.repeat_mode().previous(idx, playlist.len());
+                let next = playback_state
+                    .repeat_mode()
+                    .previous(idx, playlist.len(), rng);
                 playback_state.set_current(playlist.get(next));
                 playback_state.set_playing(true);
             }
@@ -345,7 +370,7 @@ pub fn clear_media_library(
     database: DatabasePtr,
     playlist_store: &PlaylistStore,
     scanner: ScannerPtr,
-    history: &mut History,
+    history: &mut CommandsHistory,
 ) {
     *database.write().unwrap() = Database::default();
     *scanner.write().unwrap() = Scanner::default();

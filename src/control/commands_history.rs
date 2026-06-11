@@ -1,13 +1,13 @@
 use crate::control::modify_playlist_action::ModifyPlaylistAction;
 
 #[derive(Default)]
-pub struct History {
+pub struct CommandsHistory {
     applied: Vec<ModifyPlaylistAction>,
     undone: Vec<ModifyPlaylistAction>,
 }
 
-impl History {
-    pub fn new() -> History {
+impl CommandsHistory {
+    pub fn new() -> CommandsHistory {
         Self::default()
     }
 

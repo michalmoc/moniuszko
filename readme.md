@@ -35,7 +35,6 @@ Why?
 
 for 1.2:
 
-- random modes
 - separate library for audiobooks
 - panel with details of current piece (including lyrics)
 

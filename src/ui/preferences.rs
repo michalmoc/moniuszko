@@ -27,13 +27,14 @@ impl Preferences {
 }
 
 mod imp {
-    use crate::config::ConfigPtr;
+    use crate::config::{ConfigPtr, RandomMode};
     use crate::control::commands::Command;
     use adw::glib::subclass::InitializingObject;
+    use adw::prelude::ComboRowExt;
     use adw::subclass::prelude::{
         AdwDialogImpl, ObjectImpl, ObjectSubclass, PreferencesDialogImpl,
     };
-    use adw::{EntryRow, SwitchRow, glib};
+    use adw::{ComboRow, EntryRow, SwitchRow, glib};
     use async_channel::Sender;
     use gio::glib::WeakRef;
     use gtk4::prelude::{EditableExt, GtkWindowExt, WidgetExt};
@@ -56,6 +57,9 @@ mod imp {
 
         #[template_child]
         hide_on_close: TemplateChild<SwitchRow>,
+
+        #[template_child]
+        random_mode: TemplateChild<ComboRow>,
 
         bound_data: RefCell<Option<BoundData>>,
     }
@@ -106,6 +110,11 @@ mod imp {
 
                 self.hide_on_close.set_active(cfg.hide_on_close);
                 self.hide_on_close.set_sensitive(cfg.tray_enabled);
+
+                self.random_mode.set_selected(match cfg.random_mode {
+                    RandomMode::TrueRandom => 0,
+                    RandomMode::Permutation => 1,
+                });
             }
 
             self.bound_data.replace(Some(BoundData {
@@ -153,6 +162,22 @@ mod imp {
                 if let Some(window) = bound_data.window.upgrade() {
                     window.set_hide_on_close(self.hide_on_close.is_active());
                 }
+            }
+        }
+
+        #[template_callback]
+        fn handle_random_mode(&self) {
+            if let Some(bound_data) = self.bound_data.borrow().as_ref() {
+                bound_data.config.write().unwrap().random_mode = match self.random_mode.selected() {
+                    0 => RandomMode::TrueRandom,
+                    1 => RandomMode::Permutation,
+                    _ => panic!("Invalid random mode"),
+                };
+
+                bound_data
+                    .commands
+                    .send_blocking(Command::ResetRandomData)
+                    .unwrap();
             }
         }
     }

@@ -8,6 +8,12 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum RandomMode {
+    TrueRandom,
+    Permutation,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub window_width: i32,
     pub window_height: i32,
@@ -17,6 +23,8 @@ pub struct Config {
 
     pub tray_enabled: bool,
     pub hide_on_close: bool,
+
+    pub random_mode: RandomMode,
 }
 
 impl Default for Config {
@@ -28,6 +36,7 @@ impl Default for Config {
             media_path: audio_dir().unwrap(),
             tray_enabled: false,
             hide_on_close: false,
+            random_mode: RandomMode::Permutation,
         }
     }
 }

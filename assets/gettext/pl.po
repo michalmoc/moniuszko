@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-08 19:38+0200\n"
+"POT-Creation-Date: 2026-06-11 16:55+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,27 +23,27 @@ msgid "menu-playlist"
 msgstr "Lista odtwarzania"
 
 #: src/resources/window.ui:16 src/resources/window.ui:18
-#: src/resources/window.ui:28
+#: src/resources/window.ui:28 src/resources/window.ui:28
 msgid "menu-remove-selected-from-playlist"
 msgstr "Usuń zaznaczone"
 
 #: src/resources/window.ui:22 src/resources/window.ui:24
-#: src/resources/window.ui:34
+#: src/resources/window.ui:34 src/resources/window.ui:34
 msgid "menu-clear-playlist"
 msgstr "Opróżnij"
 
 #: src/resources/window.ui:27 src/resources/window.ui:29
-#: src/resources/window.ui:39
+#: src/resources/window.ui:39 src/resources/window.ui:39
 msgid "menu-program"
 msgstr "Program"
 
 #: src/resources/window.ui:29 src/resources/window.ui:31
-#: src/resources/window.ui:41
+#: src/resources/window.ui:41 src/resources/window.ui:41
 msgid "menu-config"
 msgstr "Opcje"
 
 #: src/resources/window.ui:33 src/resources/window.ui:35
-#: src/resources/window.ui:45
+#: src/resources/window.ui:45 src/resources/window.ui:45
 msgid "menu-quit"
 msgstr "Zakończ"
 
@@ -55,98 +55,118 @@ msgstr "Główne"
 msgid "settings-media-path"
 msgstr "Ścieżka mediów"
 
-#: src/resources/preferences.ui:22 src/resources/preferences.ui:22
+#: src/resources/preferences.ui:22 src/resources/preferences.ui:37
 msgid "settings-clear-database"
 msgstr "Wyczyść bazę danych"
 
-#: src/resources/preferences.ui:30 src/resources/preferences.ui:30
+#: src/resources/preferences.ui:30 src/resources/preferences.ui:45
 msgid "settings-tray"
 msgstr "Tray"
 
-#: src/resources/preferences.ui:36 src/resources/preferences.ui:36
+#: src/resources/preferences.ui:36 src/resources/preferences.ui:51
 msgid "settings-enable-tray"
 msgstr "Pokaż w zasobniku systemowym"
 
-#: src/resources/preferences.ui:37 src/resources/preferences.ui:37
+#: src/resources/preferences.ui:37 src/resources/preferences.ui:52
 msgid "settings-requires-restart"
 msgstr "wymaga ponownego uruchomienia"
 
-#: src/resources/preferences.ui:44 src/resources/preferences.ui:44
+#: src/resources/preferences.ui:44 src/resources/preferences.ui:59
 msgid "settings-hide-on-close"
 msgstr "Ukryj zamiast wyłączać"
 
-#: src/tray.rs:59 src/control/tray.rs:59
+#: src/tray.rs:59 src/control/tray.rs:59 src/control/tray.rs:59
 msgid "tray-hide-show"
 msgstr "Pokaż/ukryj"
 
-#: src/tray.rs:67 src/control/tray.rs:67
+#: src/tray.rs:67 src/control/tray.rs:67 src/control/tray.rs:67
 msgid "tray-exit"
 msgstr "Zakończ"
 
 #: src/media_library/grouping_mode.rs:44 src/media_library/grouping_mode.rs:62
+#: src/data/grouping_mode.rs:22 src/data/grouping_mode.rs:40
 #: src/data/grouping_mode.rs:22 src/data/grouping_mode.rs:40
 msgid "none"
 msgstr "brak"
 
 #: src/media_library/grouping_mode.rs:45 src/media_library/grouping_mode.rs:63
 #: src/data/grouping_mode.rs:23 src/data/grouping_mode.rs:41
+#: src/data/grouping_mode.rs:23 src/data/grouping_mode.rs:41
 msgid "album"
 msgstr "Album"
 
 #: src/media_library/grouping_mode.rs:46 src/media_library/grouping_mode.rs:64
+#: src/data/grouping_mode.rs:24 src/data/grouping_mode.rs:42
 #: src/data/grouping_mode.rs:24 src/data/grouping_mode.rs:42
 msgid "artist-album"
 msgstr "Artysta / Album"
 
 #: src/media_library/grouping_mode.rs:47 src/media_library/grouping_mode.rs:65
 #: src/data/grouping_mode.rs:25 src/data/grouping_mode.rs:43
+#: src/data/grouping_mode.rs:25 src/data/grouping_mode.rs:43
 msgid "artist-year-album"
 msgstr "Artysta / Rok/ Album"
 
 #: src/media_library/grouping_mode.rs:48 src/media_library/grouping_mode.rs:66
+#: src/data/grouping_mode.rs:26 src/data/grouping_mode.rs:44
 #: src/data/grouping_mode.rs:26 src/data/grouping_mode.rs:44
 msgid "genre-album"
 msgstr "Gatunek / Album"
 
 #: src/media_library/grouping_mode.rs:49 src/media_library/grouping_mode.rs:67
 #: src/data/grouping_mode.rs:27 src/data/grouping_mode.rs:45
+#: src/data/grouping_mode.rs:27 src/data/grouping_mode.rs:45
 msgid "genre-year-album"
 msgstr "Gatunek / Rok / Album"
 
 #: src/media_library/grouping_mode.rs:51 src/media_library/grouping_mode.rs:68
+#: src/data/grouping_mode.rs:29 src/data/grouping_mode.rs:46
 #: src/data/grouping_mode.rs:29 src/data/grouping_mode.rs:46
 msgid "genre-artist-album"
 msgstr "Gatunek / Artysta / Album"
 
 #: src/media_library/grouping_mode.rs:54 src/media_library/grouping_mode.rs:69
 #: src/data/grouping_mode.rs:32 src/data/grouping_mode.rs:47
+#: src/data/grouping_mode.rs:32 src/data/grouping_mode.rs:47
 msgid "year-album"
 msgstr "Rok / Album"
 
-#: src/playlist/ui.rs:194 src/ui/playlist.rs:163
+#: src/playlist/ui.rs:194 src/ui/playlist.rs:163 src/ui/playlist.rs:154
 msgid "column-track"
 msgstr "#"
 
-#: src/playlist/ui.rs:195 src/ui/playlist.rs:164
+#: src/playlist/ui.rs:195 src/ui/playlist.rs:164 src/ui/playlist.rs:155
 msgid "column-title"
 msgstr "Tytuł"
 
-#: src/playlist/ui.rs:196 src/ui/playlist.rs:165
+#: src/playlist/ui.rs:196 src/ui/playlist.rs:165 src/ui/playlist.rs:156
 msgid "column-artists"
 msgstr "Artyści"
 
-#: src/playlist/ui.rs:197 src/ui/playlist.rs:166
+#: src/playlist/ui.rs:197 src/ui/playlist.rs:166 src/ui/playlist.rs:157
 msgid "column-album"
 msgstr "Album"
 
-#: src/playlist/ui.rs:198 src/ui/playlist.rs:167
+#: src/playlist/ui.rs:198 src/ui/playlist.rs:167 src/ui/playlist.rs:158
 msgid "column-duration"
 msgstr "Długość"
 
-#: src/resources/window.ui:19
+#: src/resources/window.ui:19 src/resources/window.ui:19
 msgid "menu-undo"
 msgstr "Cofnij"
 
-#: src/resources/window.ui:24
+#: src/resources/window.ui:24 src/resources/window.ui:24
 msgid "menu-redo"
 msgstr "Powtórz"
+
+#: src/resources/preferences.ui:22
+msgid "settings-random-mode"
+msgstr "Sposób losowania"
+
+#: src/resources/preferences.ui:26
+msgid "setting-true-random"
+msgstr "Zupełnie losowo"
+
+#: src/resources/preferences.ui:27
+msgid "setting-permutation"
+msgstr "Permutacja"
