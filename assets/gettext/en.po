@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-11 16:55+0200\n"
+"POT-Creation-Date: 2026-06-13 21:04+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -55,22 +55,27 @@ msgid "settings-media-path"
 msgstr "Media path"
 
 #: src/resources/preferences.ui:22 src/resources/preferences.ui:37
+#: src/resources/preferences.ui:37
 msgid "settings-clear-database"
 msgstr "Clear database"
 
 #: src/resources/preferences.ui:30 src/resources/preferences.ui:45
+#: src/resources/preferences.ui:45
 msgid "settings-tray"
 msgstr "Tray"
 
 #: src/resources/preferences.ui:36 src/resources/preferences.ui:51
+#: src/resources/preferences.ui:51
 msgid "settings-enable-tray"
 msgstr "Enable tray"
 
 #: src/resources/preferences.ui:37 src/resources/preferences.ui:52
+#: src/resources/preferences.ui:52
 msgid "settings-requires-restart"
 msgstr "requires restart"
 
 #: src/resources/preferences.ui:44 src/resources/preferences.ui:59
+#: src/resources/preferences.ui:59
 msgid "settings-hide-on-close"
 msgstr "Hide instead of closing"
 
@@ -83,70 +88,75 @@ msgid "tray-exit"
 msgstr "Quit"
 
 #: src/playlist/ui.rs:194 src/ui/playlist.rs:163 src/ui/playlist.rs:154
+#: src/ui/playlist.rs:154
 msgid "column-track"
 msgstr "#"
 
 #: src/playlist/ui.rs:195 src/ui/playlist.rs:164 src/ui/playlist.rs:155
+#: src/ui/playlist.rs:155
 msgid "column-title"
 msgstr "Title"
 
 #: src/playlist/ui.rs:196 src/ui/playlist.rs:165 src/ui/playlist.rs:156
+#: src/ui/playlist.rs:156
 msgid "column-artists"
 msgstr "Artist"
 
 #: src/playlist/ui.rs:197 src/ui/playlist.rs:166 src/ui/playlist.rs:157
+#: src/ui/playlist.rs:157
 msgid "column-album"
 msgstr "Album"
 
 #: src/playlist/ui.rs:198 src/ui/playlist.rs:167 src/ui/playlist.rs:158
+#: src/ui/playlist.rs:158
 msgid "column-duration"
 msgstr "Length"
 
 #: src/media_library/grouping_mode.rs:44 src/media_library/grouping_mode.rs:62
 #: src/data/grouping_mode.rs:22 src/data/grouping_mode.rs:40
-#: src/data/grouping_mode.rs:22 src/data/grouping_mode.rs:40
+#: src/data/grouping_mode.rs:23 src/data/grouping_mode.rs:41
 msgid "none"
 msgstr "none"
 
 #: src/media_library/grouping_mode.rs:45 src/media_library/grouping_mode.rs:63
 #: src/data/grouping_mode.rs:23 src/data/grouping_mode.rs:41
-#: src/data/grouping_mode.rs:23 src/data/grouping_mode.rs:41
+#: src/data/grouping_mode.rs:24 src/data/grouping_mode.rs:42
 msgid "album"
 msgstr "Album"
 
 #: src/media_library/grouping_mode.rs:46 src/media_library/grouping_mode.rs:64
 #: src/data/grouping_mode.rs:24 src/data/grouping_mode.rs:42
-#: src/data/grouping_mode.rs:24 src/data/grouping_mode.rs:42
+#: src/data/grouping_mode.rs:25 src/data/grouping_mode.rs:43
 msgid "artist-album"
 msgstr "Artist / Album"
 
 #: src/media_library/grouping_mode.rs:47 src/media_library/grouping_mode.rs:65
 #: src/data/grouping_mode.rs:25 src/data/grouping_mode.rs:43
-#: src/data/grouping_mode.rs:25 src/data/grouping_mode.rs:43
+#: src/data/grouping_mode.rs:26 src/data/grouping_mode.rs:44
 msgid "artist-year-album"
 msgstr "Artist / Year / Album"
 
 #: src/media_library/grouping_mode.rs:48 src/media_library/grouping_mode.rs:66
 #: src/data/grouping_mode.rs:26 src/data/grouping_mode.rs:44
-#: src/data/grouping_mode.rs:26 src/data/grouping_mode.rs:44
+#: src/data/grouping_mode.rs:27 src/data/grouping_mode.rs:45
 msgid "genre-album"
 msgstr "Genre / Album"
 
 #: src/media_library/grouping_mode.rs:49 src/media_library/grouping_mode.rs:67
 #: src/data/grouping_mode.rs:27 src/data/grouping_mode.rs:45
-#: src/data/grouping_mode.rs:27 src/data/grouping_mode.rs:45
+#: src/data/grouping_mode.rs:28 src/data/grouping_mode.rs:46
 msgid "genre-year-album"
 msgstr "Genre / Year / Album"
 
 #: src/media_library/grouping_mode.rs:51 src/media_library/grouping_mode.rs:68
 #: src/data/grouping_mode.rs:29 src/data/grouping_mode.rs:46
-#: src/data/grouping_mode.rs:29 src/data/grouping_mode.rs:46
+#: src/data/grouping_mode.rs:30 src/data/grouping_mode.rs:47
 msgid "genre-artist-album"
 msgstr "Genre / Artist / Album"
 
 #: src/media_library/grouping_mode.rs:54 src/media_library/grouping_mode.rs:69
 #: src/data/grouping_mode.rs:32 src/data/grouping_mode.rs:47
-#: src/data/grouping_mode.rs:32 src/data/grouping_mode.rs:47
+#: src/data/grouping_mode.rs:33 src/data/grouping_mode.rs:48
 msgid "year-album"
 msgstr "Year / Album"
 
@@ -158,14 +168,22 @@ msgstr "Undo"
 msgid "menu-redo"
 msgstr "Redo"
 
-#: src/resources/preferences.ui:22
+#: src/resources/preferences.ui:22 src/resources/preferences.ui:22
 msgid "settings-random-mode"
 msgstr "Random mode"
 
-#: src/resources/preferences.ui:26
+#: src/resources/preferences.ui:26 src/resources/preferences.ui:26
 msgid "setting-true-random"
 msgstr "Truly random"
 
-#: src/resources/preferences.ui:27
+#: src/resources/preferences.ui:27 src/resources/preferences.ui:27
 msgid "setting-permutation"
 msgstr "Permutation"
+
+#: src/resources/window.ui:73
+msgid "tab-music"
+msgstr "Music"
+
+#: src/resources/window.ui:86
+msgid "tab-books"
+msgstr "Books"

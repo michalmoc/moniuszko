@@ -35,7 +35,6 @@ Why?
 
 for 1.2:
 
-- separate library for audiobooks
 - panel with details of current piece (including lyrics)
 
 for 1.3:

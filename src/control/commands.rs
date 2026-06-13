@@ -96,7 +96,6 @@ pub enum Command {
     Undo,
     Redo,
 
-    RepopulateMediaLibrary,
     RefreshMediaLibrary,
     ClearMediaLibrary,
 
@@ -172,7 +171,6 @@ pub async fn process_commands(
                     reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
                 }
             }
-            Command::RepopulateMediaLibrary => window.repopulate_media_library(),
             Command::RefreshMediaLibrary => refresh_library(
                 window.clone(),
                 database.clone(),
@@ -301,26 +299,26 @@ fn get_tracks(database: &Database, item: ObjectId) -> Vec<TrackId> {
         ObjectId::TrackId(track_id) => {
             vec![track_id]
         }
-        ObjectId::AlbumId(album_id) => database.sorted_tracks_of_album(album_id),
+        ObjectId::AlbumId(album_id) => database.all_sorted_tracks_of_album(album_id),
         ObjectId::ArtistId(artist) => {
-            let albums = database.sorted_albums_of_artist(artist);
+            let albums = database.all_sorted_albums_of_artist(artist);
             albums
                 .into_iter()
-                .flat_map(|a| database.sorted_tracks_of_album(a))
+                .flat_map(|a| database.all_sorted_tracks_of_album(a))
                 .collect()
         }
         ObjectId::Genre(genre) => {
-            let albums = database.sorted_albums_of_genre(genre);
+            let albums = database.all_sorted_albums_of_genre(genre);
             albums
                 .into_iter()
-                .flat_map(|a| database.sorted_tracks_of_album(a))
+                .flat_map(|a| database.all_sorted_tracks_of_album(a))
                 .collect()
         }
         ObjectId::Year(year) => {
-            let albums = database.sorted_albums_of_year(year);
+            let albums = database.all_sorted_albums_of_year(year);
             albums
                 .into_iter()
-                .flat_map(|a| database.sorted_tracks_of_album(a))
+                .flat_map(|a| database.all_sorted_tracks_of_album(a))
                 .collect()
         }
     }
@@ -333,7 +331,7 @@ pub fn refresh_library(
     scanner: ScannerPtr,
 ) {
     glib::spawn_future_local(async move {
-        window.refresh_button().set_sensitive(false);
+        window.lock_refresh(true);
 
         gio::spawn_blocking(clone!(
             #[weak]
@@ -361,7 +359,7 @@ pub fn refresh_library(
         window.repopulate_media_library();
         refresh_playlist(&window.playlist(), &database.read().unwrap());
 
-        window.refresh_button().set_sensitive(true);
+        window.lock_refresh(false);
     });
 }
 

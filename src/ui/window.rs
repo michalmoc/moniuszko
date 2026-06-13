@@ -2,13 +2,12 @@ use crate::config::{Config, ConfigPtr};
 use crate::control::commands::Command;
 use crate::control::playback_state::PlaybackState;
 use crate::control::playlist_store::PlaylistStore;
-use crate::data::grouping_mode::GroupingModePtr;
 use crate::db::database::DatabasePtr;
-use crate::db::search_result::SearchResultPtr;
 use adw::subclass::prelude::ObjectSubclassIsExt;
 use async_channel::Sender;
 use glib::Object;
-use gtk4::{Button, gio, glib};
+use gtk4::prelude::WidgetExt;
+use gtk4::{gio, glib};
 
 glib::wrapper! {
     pub struct Window(ObjectSubclass<imp::Window>)
@@ -28,16 +27,8 @@ impl Window {
             .build()
     }
 
-    pub fn bind_data(
-        &self,
-        database: DatabasePtr,
-        search_result: SearchResultPtr,
-        grouping_mode: GroupingModePtr,
-        config: ConfigPtr,
-        commands: Sender<Command>,
-    ) {
-        self.imp()
-            .bind_data(database, search_result, grouping_mode, config, commands);
+    pub fn bind_data(&self, database: DatabasePtr, config: ConfigPtr, commands: Sender<Command>) {
+        self.imp().bind_data(database, config, commands);
     }
 
     pub fn playlist(&self) -> PlaylistStore {
@@ -54,12 +45,20 @@ impl Window {
         self.imp().playback.get()
     }
 
-    pub fn repopulate_media_library(&self) {
-        self.imp().media_library.repopulate()
+    pub fn lock_refresh(&self, val: bool) {
+        self.imp()
+            .media_panel_music
+            .refresh_button()
+            .set_sensitive(!val);
+        self.imp()
+            .media_panel_books
+            .refresh_button()
+            .set_sensitive(!val);
     }
 
-    pub fn refresh_button(&self) -> Button {
-        self.imp().refresh_button.get()
+    pub fn repopulate_media_library(&self) {
+        self.imp().media_panel_music.repopulate();
+        self.imp().media_panel_books.repopulate()
     }
 }
 
@@ -68,12 +67,10 @@ mod imp {
     use crate::control::commands::{Command, ModifyPlaylistCommand};
     use crate::control::playback_state::PlaybackState;
     use crate::control::playlist_store::PlaylistStore;
-    use crate::data::grouping_mode::{GroupingMode, GroupingModePtr};
     use crate::data::object_id::{ObjectId, ObjectIds};
     use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
     use crate::db::database::DatabasePtr;
-    use crate::db::search_result::SearchResultPtr;
-    use crate::ui::media_library::MediaLibraryUi;
+    use crate::ui::media_panel::MediaPanel;
     use crate::ui::player::PlayerUi;
     use crate::ui::playlist::PlaylistUi;
     use crate::ui::preferences::Preferences;
@@ -83,36 +80,27 @@ mod imp {
     use gtk4::gdk::{Key, ModifierType};
     use gtk4::glib::Propagation;
     use gtk4::glib::subclass::InitializingObject;
-    use gtk4::prelude::{Cast, CastNone, EditableExt, GtkWindowExt, ObjectExt, WidgetExt};
+    use gtk4::prelude::{Cast, GtkWindowExt, ObjectExt, WidgetExt};
     use gtk4::subclass::prelude::ObjectSubclassExt;
+    use gtk4::subclass::prelude::WidgetClassExt;
     use gtk4::subclass::prelude::{
         ApplicationWindowImpl, CompositeTemplateClass, ObjectImpl, ObjectSubclass,
     };
-    use gtk4::subclass::prelude::{ObjectImplExt, WidgetClassExt};
     use gtk4::subclass::widget::{
         CompositeTemplateCallbacksClass, CompositeTemplateInitializingExt, WidgetImpl,
     };
     use gtk4::subclass::window::WindowImpl;
-    use gtk4::{
-        Button, CompositeTemplate, DropDown, SearchEntry, StringList, StringObject, TemplateChild,
-        glib, template_callbacks,
-    };
+    use gtk4::{CompositeTemplate, TemplateChild, glib, template_callbacks};
     use std::cell::RefCell;
 
     #[derive(CompositeTemplate, Default)]
     #[template(resource = "/org/moniuszko/window.ui")]
     pub struct Window {
         #[template_child]
-        pub search_entry: TemplateChild<SearchEntry>,
+        pub media_panel_music: TemplateChild<MediaPanel>,
 
         #[template_child]
-        pub grouping_mode: TemplateChild<DropDown>,
-
-        #[template_child]
-        pub refresh_button: TemplateChild<Button>,
-
-        #[template_child]
-        pub media_library: TemplateChild<MediaLibraryUi>,
+        pub media_panel_books: TemplateChild<MediaPanel>,
 
         #[template_child]
         pub playlist: TemplateChild<PlaylistUi>,
@@ -129,10 +117,8 @@ mod imp {
     pub struct BoundData {
         pub commands: Sender<Command>,
         pub playlist: PlaylistStore,
-        pub grouping_mode: GroupingModePtr,
         pub database: DatabasePtr,
         pub config: ConfigPtr,
-        pub search_result: SearchResultPtr,
     }
 
     #[glib::object_subclass]
@@ -193,27 +179,12 @@ mod imp {
         }
     }
 
-    impl ObjectImpl for Window {
-        fn constructed(&self) {
-            self.parent_constructed();
+    impl ObjectImpl for Window {}
 
-            // TODO change into enum
-            let grouping_mode_list = StringList::new(&[]);
-            for e in GroupingMode::all_str() {
-                grouping_mode_list.append(&e);
-            }
-            self.grouping_mode.set_model(Some(&grouping_mode_list));
-            self.grouping_mode.set_selected(1);
-        }
-    }
-
-    #[template_callbacks]
     impl Window {
         pub fn bind_data(
             &self,
             database: DatabasePtr,
-            search_result: SearchResultPtr,
-            grouping_mode: GroupingModePtr,
             config: ConfigPtr,
             commands: Sender<Command>,
         ) {
@@ -221,20 +192,16 @@ mod imp {
             let playlist =
                 PlaylistStore::wrap_and_load(playlist, &database.read().unwrap(), config.clone());
 
-            self.media_library.bind_data(
-                database.clone(),
-                search_result.clone(),
-                grouping_mode.clone(),
-            );
-            self.media_library.repopulate();
+            self.media_panel_music.bind_data(database.clone());
+            self.media_panel_music.repopulate();
+            self.media_panel_books.bind_data(database.clone());
+            self.media_panel_books.repopulate();
 
             self.bound_data.replace(Some(BoundData {
                 commands,
                 playlist,
-                grouping_mode,
                 database,
                 config,
-                search_result,
             }));
         }
 
@@ -248,7 +215,10 @@ mod imp {
                 .send_blocking(command)
                 .unwrap()
         }
+    }
 
+    #[template_callbacks]
+    impl Window {
         #[template_callback]
         fn handle_request_add_tracks(&self, objs: ObjectIds, pos: u32) {
             self.command(Command::ModifyPlaylist(ModifyPlaylistCommand::Add(
@@ -304,37 +274,8 @@ mod imp {
         }
 
         #[template_callback]
-        fn handle_grouping_mode_change(&self) {
-            if let Some(bound_data) = self.bound_data.borrow().as_ref() {
-                let selected = self
-                    .grouping_mode
-                    .selected_item()
-                    .and_downcast::<StringObject>()
-                    .unwrap()
-                    .string();
-                bound_data
-                    .grouping_mode
-                    .set(GroupingMode::from_str(&selected).unwrap());
-                self.command(Command::RepopulateMediaLibrary)
-            }
-        }
-
-        #[template_callback]
         fn handle_refresh(&self) {
             self.command(Command::RefreshMediaLibrary)
-        }
-
-        #[template_callback]
-        fn handle_search_changed(&self) {
-            if let Some(bound_data) = self.bound_data.borrow().as_ref() {
-                let result = bound_data
-                    .database
-                    .read()
-                    .unwrap()
-                    .search(&self.search_entry.text());
-                bound_data.search_result.replace(result);
-                self.command(Command::RepopulateMediaLibrary)
-            }
         }
 
         #[template_callback]

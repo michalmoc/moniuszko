@@ -253,7 +253,7 @@ pub async fn mpris(
                     );
 
                     let db = database.read().unwrap();
-                    let current = &db[current.stored_track()];
+                    let current = &db.get_track(current.stored_track()).unwrap();
 
                     metadata.insert(
                         "mpris:length".to_string(),
@@ -268,7 +268,7 @@ pub async fn mpris(
                     let artists = current
                         .artist_ids
                         .iter()
-                        .filter_map(|a| db[*a].name)
+                        .filter_map(|a| db.get_artist(*a).unwrap().name)
                         .map(|a| a.to_string())
                         .collect_vec();
 
@@ -277,7 +277,7 @@ pub async fn mpris(
                         Value::new(artists).try_into_owned()?,
                     );
 
-                    let album = &db[current.album];
+                    let album = db.get_album(current.album).unwrap();
                     metadata.insert(
                         "xesam:album".to_string(),
                         Value::new(album.title.to_string()).try_into_owned()?,

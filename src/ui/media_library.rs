@@ -1,7 +1,5 @@
 use crate::data::category::Category;
-use crate::data::grouping_mode::GroupingModePtr;
 use crate::db::database::DatabasePtr;
-use crate::db::search_result::SearchResultPtr;
 use crate::ui::media_library_item::MediaLibraryItem;
 use gtk4::prelude::{Cast, CastNone};
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
@@ -14,27 +12,12 @@ glib::wrapper! {
         @implements gtk4::Accessible, gtk4::Buildable, gtk4::ConstraintTarget;
 }
 impl MediaLibraryUi {
-    pub fn bind_data(
-        &self,
-        database: DatabasePtr,
-        search_result: SearchResultPtr,
-        grouping_mode: GroupingModePtr,
-    ) {
+    pub fn bind_data(&self, database: DatabasePtr) {
         self.imp().database.replace(Some(database));
-        self.imp().search_result.replace(Some(search_result));
-        self.imp().grouping_mode.replace(Some(grouping_mode));
     }
 
     fn database(&self) -> Ref<'_, DatabasePtr> {
         Ref::map(self.imp().database.borrow(), |r| r.as_ref().unwrap())
-    }
-
-    fn search_result(&self) -> Ref<'_, SearchResultPtr> {
-        Ref::map(self.imp().search_result.borrow(), |r| r.as_ref().unwrap())
-    }
-
-    fn grouping_mode(&self) -> Ref<'_, GroupingModePtr> {
-        Ref::map(self.imp().grouping_mode.borrow(), |r| r.as_ref().unwrap())
     }
 
     pub fn repopulate(&self) {
@@ -53,43 +36,47 @@ impl MediaLibraryUi {
 
         store.remove_all();
 
+        if self.imp().database.borrow().is_none() {
+            return;
+        }
+
         let database_ptr = self.database();
         let database = database_ptr.read().unwrap();
+        let subdb = database.get_subdb(self.subdatabase());
 
-        let search_result_ptr = self.search_result();
-        let search_result = search_result_ptr.borrow();
+        let search_result = self.imp().search_result.borrow();
 
-        match self.grouping_mode().get().top_category() {
+        match self.grouping_mode().top_category() {
             Category::Track => {
-                for track_id in database.sorted_tracks() {
+                for track_id in subdb.sorted_tracks() {
                     if search_result.has_track(track_id) {
-                        store.append(&MediaLibraryItem::new_track(track_id, vec![], &database));
+                        store.append(&MediaLibraryItem::new_track(track_id, vec![], &subdb));
                     }
                 }
             }
             Category::Album => {
-                for album_id in database.sorted_albums() {
+                for album_id in subdb.sorted_albums() {
                     if search_result.has_album(album_id) {
-                        store.append(&MediaLibraryItem::new_album(album_id, vec![], &database));
+                        store.append(&MediaLibraryItem::new_album(album_id, vec![], &subdb));
                     }
                 }
             }
             Category::Artist => {
-                for artist_id in database.sorted_artists() {
+                for artist_id in subdb.sorted_artists() {
                     if search_result.has_artist(artist_id) {
-                        store.append(&MediaLibraryItem::new_artist(artist_id, vec![], &database));
+                        store.append(&MediaLibraryItem::new_artist(artist_id, vec![], &subdb));
                     }
                 }
             }
             Category::Genre => {
-                for genre in database.sorted_genres() {
+                for genre in subdb.sorted_genres() {
                     if search_result.has_genre(genre) {
                         store.append(&MediaLibraryItem::new_genre(genre, vec![]));
                     }
                 }
             }
             Category::Year => {
-                for year in database.sorted_years() {
+                for year in subdb.sorted_years() {
                     if search_result.has_year(year) {
                         store.append(&MediaLibraryItem::new_year(year, vec![]));
                     }
@@ -101,10 +88,10 @@ impl MediaLibraryUi {
 
 mod imp {
     use crate::data::category::Category;
-    use crate::data::grouping_mode::GroupingModePtr;
+    use crate::data::grouping_mode::GroupingMode;
     use crate::data::object_id::{ObjectId, ObjectIds};
-    use crate::db::database::DatabasePtr;
-    use crate::db::search_result::SearchResultPtr;
+    use crate::db::database::{AvailableDatabases, DatabasePtr};
+    use crate::db::search_result::SearchResult;
     use crate::ui::dnd_item::DndItem;
     use crate::ui::media_library_item::MediaLibraryItem;
     use adw::glib;
@@ -117,23 +104,31 @@ mod imp {
         BoxExt, Cast, CastNone, EventControllerExt, ListItemExt, ObjectExt, SelectionModelExt,
         StaticType, WidgetExt,
     };
-    use gtk4::subclass::prelude::DerivedObjectProperties;
+    use gtk4::subclass::prelude::{DerivedObjectProperties, ObjectSubclassIsExt};
     use gtk4::subclass::prelude::{WidgetClassExt, WidgetImpl};
     use gtk4::{
         DragSource, Image, Label, ListView, MultiSelection, Orientation, PickFlags,
         SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget, gdk,
     };
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     use std::sync::OnceLock;
 
     #[derive(Properties, Default)]
     #[properties(wrapper_type = super::MediaLibraryUi)]
     pub struct MediaLibraryUi {
+        #[property(get, set, default)]
+        pub subdatabase: Cell<AvailableDatabases>,
+
+        #[property(get, set)]
+        pub search_text: RefCell<String>,
+
+        #[property(get, set, default)]
+        pub grouping_mode: RefCell<GroupingMode>,
+
         pub view: RefCell<Option<ListView>>,
 
         pub database: RefCell<Option<DatabasePtr>>,
-        pub search_result: RefCell<Option<SearchResultPtr>>,
-        pub grouping_mode: RefCell<Option<GroupingModePtr>>,
+        pub search_result: RefCell<SearchResult>,
     }
 
     #[glib::object_subclass]
@@ -153,6 +148,10 @@ mod imp {
         fn constructed(&self) {
             self.parent_constructed();
             let obj = self.obj();
+
+            obj.connect_subdatabase_notify(|this| this.imp().on_subdb_change());
+            obj.connect_search_text_notify(|this| this.imp().on_search_changed());
+            obj.connect_grouping_mode_notify(|this| this.imp().on_grouping_changed());
 
             let view = new_view(obj.clone());
             view.set_parent(&*obj);
@@ -190,6 +189,30 @@ mod imp {
     }
 
     impl WidgetImpl for MediaLibraryUi {}
+
+    impl MediaLibraryUi {
+        fn on_search_changed(&self) {
+            if let Some(db_ptr) = self.database.borrow().as_ref() {
+                let db = db_ptr.read().unwrap();
+                let subdb = db.get_subdb(self.subdatabase.get());
+
+                self.search_result
+                    .replace(subdb.search(&self.search_text.borrow()));
+            } else {
+                self.search_result.replace(SearchResult::default());
+            }
+
+            self.obj().repopulate()
+        }
+
+        fn on_grouping_changed(&self) {
+            self.obj().repopulate()
+        }
+
+        fn on_subdb_change(&self) {
+            self.on_search_changed()
+        }
+    }
 
     fn new_view(obj: super::MediaLibraryUi) -> ListView {
         let factory = SignalListItemFactory::new();
@@ -265,7 +288,7 @@ mod imp {
 
     fn create(item: &Object, obj: &super::MediaLibraryUi) -> Option<gio::ListModel> {
         let item = item.downcast_ref::<MediaLibraryItem>().unwrap();
-        let grouping_mode = obj.grouping_mode().get();
+        let grouping_mode = obj.grouping_mode();
 
         let current = item.stored_object();
         let current_category = Category::of(&current);
@@ -278,45 +301,35 @@ mod imp {
 
         let database_ptr = obj.database();
         let database = database_ptr.read().unwrap();
+        let subdb = database.get_subdb(obj.subdatabase());
 
-        let search_result_ptr = obj.search_result();
-        let search_result = search_result_ptr.borrow();
+        let search_result = obj.imp().search_result.borrow();
 
         match (current, next_category) {
             (ObjectId::None, _) => None,
             (ObjectId::TrackId(_), _) => None,
             (ObjectId::AlbumId(album_id), Category::Track) => {
-                for track in database.sorted_tracks_of_album(album_id) {
-                    if database.track_matches_filter(track, &filters)
-                        && search_result.has_track(track)
+                for track in subdb.sorted_tracks_of_album(album_id) {
+                    if subdb.track_matches_filter(track, &filters) && search_result.has_track(track)
                     {
-                        store.append(&MediaLibraryItem::new_track(
-                            track,
-                            filters.clone(),
-                            &database,
-                        ));
+                        store.append(&MediaLibraryItem::new_track(track, filters.clone(), &subdb));
                     }
                 }
 
                 Some(store.upcast())
             }
             (ObjectId::ArtistId(artist_id), Category::Album) => {
-                for album in database.sorted_albums_of_artist(artist_id) {
-                    if database.album_matches_filter(album, &filters)
-                        && search_result.has_album(album)
+                for album in subdb.sorted_albums_of_artist(artist_id) {
+                    if subdb.album_matches_filter(album, &filters) && search_result.has_album(album)
                     {
-                        store.append(&MediaLibraryItem::new_album(
-                            album,
-                            filters.clone(),
-                            &database,
-                        ));
+                        store.append(&MediaLibraryItem::new_album(album, filters.clone(), &subdb));
                     }
                 }
 
                 Some(store.upcast())
             }
             (ObjectId::ArtistId(artist_id), Category::Year) => {
-                for year in database.sorted_years_of_artist(artist_id) {
+                for year in subdb.sorted_years_of_artist(artist_id) {
                     // TODO: _matches_filter
                     if search_result.has_year(year) {
                         store.append(&MediaLibraryItem::new_year(year, filters.clone()));
@@ -326,22 +339,17 @@ mod imp {
                 Some(store.upcast())
             }
             (ObjectId::Genre(genre), Category::Album) => {
-                for album in database.sorted_albums_of_genre(genre) {
-                    if database.album_matches_filter(album, &filters)
-                        && search_result.has_album(album)
+                for album in subdb.sorted_albums_of_genre(genre) {
+                    if subdb.album_matches_filter(album, &filters) && search_result.has_album(album)
                     {
-                        store.append(&MediaLibraryItem::new_album(
-                            album,
-                            filters.clone(),
-                            &database,
-                        ));
+                        store.append(&MediaLibraryItem::new_album(album, filters.clone(), &subdb));
                     }
                 }
 
                 Some(store.upcast())
             }
             (ObjectId::Genre(genre), Category::Year) => {
-                for year in database.sorted_years_of_genre(genre) {
+                for year in subdb.sorted_years_of_genre(genre) {
                     // TODO: _matches_filter
                     if search_result.has_year(year) {
                         store.append(&MediaLibraryItem::new_year(year, filters.clone()));
@@ -351,13 +359,13 @@ mod imp {
                 Some(store.upcast())
             }
             (ObjectId::Genre(genre), Category::Artist) => {
-                for artist in database.sorted_artists_of_genre(genre) {
+                for artist in subdb.sorted_artists_of_genre(genre) {
                     // TODO: _matches_filter
                     if search_result.has_artist(artist) {
                         store.append(&MediaLibraryItem::new_artist(
                             artist,
                             filters.clone(),
-                            &database,
+                            &subdb,
                         ));
                     }
                 }
@@ -365,15 +373,10 @@ mod imp {
                 Some(store.upcast())
             }
             (ObjectId::Year(year), Category::Album) => {
-                for album in database.sorted_albums_of_year(year) {
-                    if database.album_matches_filter(album, &filters)
-                        && search_result.has_album(album)
+                for album in subdb.sorted_albums_of_year(year) {
+                    if subdb.album_matches_filter(album, &filters) && search_result.has_album(album)
                     {
-                        store.append(&MediaLibraryItem::new_album(
-                            album,
-                            filters.clone(),
-                            &database,
-                        ));
+                        store.append(&MediaLibraryItem::new_album(album, filters.clone(), &subdb));
                     }
                 }
 

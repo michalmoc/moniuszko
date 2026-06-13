@@ -74,26 +74,15 @@ impl PlaylistItem {
     }
 
     pub fn set_data(&self, database: &Database) {
-        self.set_path(database[self.stored_track()].path.clone());
-        self.set_position(
-            database[self.stored_track()]
-                .position
-                .map(|n| n.to_string()),
-        );
-        self.set_name(database[self.stored_track()].title.to_string());
-        self.set_album(
-            database[database[self.stored_track()].album]
-                .title
-                .to_string(),
-        );
-        self.set_artists(
-            database[self.stored_track()]
-                .artists
-                .map(|s| s.to_string())
-                .unwrap_or_default(),
-        );
+        let track = database.get_track(self.stored_track()).unwrap();
 
-        let duration = database[self.stored_track()].duration.as_secs();
+        self.set_path(track.path.clone());
+        self.set_position(track.position.map(|n| n.to_string()));
+        self.set_name(track.title.to_string());
+        self.set_album(database.get_album(track.album).unwrap().title.to_string());
+        self.set_artists(track.artists.map(|s| s.to_string()).unwrap_or_default());
+
+        let duration = track.duration.as_secs();
         self.set_duration(format!("{:0>2}:{:0>2}", duration / 60, duration % 60));
     }
 }

@@ -18,7 +18,7 @@ impl PlaylistStore {
         if let Ok(file) = fs::File::open(path) {
             let tracks: Vec<TrackId> = serde_json::from_reader(file).unwrap();
             for track_id in tracks {
-                if database.has_track(track_id) {
+                if database.any_has_track(track_id) {
                     store.append(&PlaylistItem::new(track_id, database));
                 }
             }

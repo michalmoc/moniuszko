@@ -1,12 +1,13 @@
 use crate::data::category::Category;
 use gettextrs::gettext;
-use std::cell::Cell;
+use gtk4::glib;
 use std::collections::HashMap;
-use std::rc::Rc;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, Default, glib::Enum)]
+#[enum_type(name = "GroupingMode")]
 pub enum GroupingMode {
     None,
+    #[default]
     Album,
     ArtistAlbum,
     ArtistYearAlbum,
@@ -95,5 +96,3 @@ impl GroupingMode {
         }
     }
 }
-
-pub type GroupingModePtr = Rc<Cell<GroupingMode>>;

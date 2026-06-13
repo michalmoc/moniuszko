@@ -2,7 +2,7 @@ use crate::data::album::AlbumId;
 use crate::data::artist::ArtistId;
 use crate::data::object_id::ObjectId;
 use crate::data::track::TrackId;
-use crate::db::database::Database;
+use crate::db::database::Subdatabase;
 use gio::subclass::prelude::ObjectSubclassIsExt;
 use gtk4::glib;
 use gtk4::glib::Object;
@@ -49,7 +49,7 @@ glib::wrapper! {
 }
 
 impl MediaLibraryItem {
-    pub fn new_track(track_id: TrackId, filters: Vec<ObjectId>, database: &Database) -> Self {
+    pub fn new_track(track_id: TrackId, filters: Vec<ObjectId>, database: &Subdatabase) -> Self {
         let obj: Self = Object::builder()
             .property("stored_object", ObjectId::from(track_id))
             .property("name", database[track_id].title.to_string())
@@ -60,7 +60,7 @@ impl MediaLibraryItem {
         obj
     }
 
-    pub fn new_album(album_id: AlbumId, filters: Vec<ObjectId>, database: &Database) -> Self {
+    pub fn new_album(album_id: AlbumId, filters: Vec<ObjectId>, database: &Subdatabase) -> Self {
         let s = database[album_id].title.to_string();
         let name = if !s.is_empty() {
             s
@@ -79,7 +79,7 @@ impl MediaLibraryItem {
         obj
     }
 
-    pub fn new_artist(artist_id: ArtistId, filters: Vec<ObjectId>, database: &Database) -> Self {
+    pub fn new_artist(artist_id: ArtistId, filters: Vec<ObjectId>, database: &Subdatabase) -> Self {
         let obj: Self = Object::builder()
             .property("stored_object", ObjectId::from(artist_id))
             .property(

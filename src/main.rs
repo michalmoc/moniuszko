@@ -10,10 +10,8 @@ use crate::constants::APP_ID;
 use crate::control::commands::process_commands;
 use crate::control::mpris::mpris;
 use crate::control::tray::run_tray;
-use crate::data::grouping_mode::GroupingMode;
 use crate::db::database::DatabasePtr;
 use crate::db::scan::{Scanner, ScannerPtr};
-use crate::db::search_result::SearchResult;
 use crate::ui::window::Window;
 use gettextrs::{LocaleCategory, bind_textdomain_codeset, bindtextdomain, setlocale, textdomain};
 use gtk::glib;
@@ -21,9 +19,7 @@ use gtk::prelude::*;
 use gtk4 as gtk;
 use gtk4::CssProvider;
 use gtk4::gdk::Display;
-use std::cell::{Cell, RefCell};
 use std::fs::File;
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 pub fn set_global_locale_gettext() {
@@ -82,18 +78,10 @@ fn build_ui(
     config: &ConfigPtr,
     scanner: &ScannerPtr,
 ) {
-    let grouping_mode = Rc::new(Cell::new(GroupingMode::Album));
-    let search_result = Rc::new(RefCell::new(SearchResult::default()));
     let (sender, receiver) = async_channel::unbounded();
 
     let window = Window::new(app, &config.read().unwrap());
-    window.bind_data(
-        database.clone(),
-        search_result,
-        grouping_mode,
-        config.clone(),
-        sender.clone(),
-    );
+    window.bind_data(database.clone(), config.clone(), sender.clone());
     window.present();
 
     glib::spawn_future_local(process_commands(

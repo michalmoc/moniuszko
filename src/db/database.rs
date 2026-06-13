@@ -4,6 +4,7 @@ use crate::data::genre::Genre;
 use crate::data::object_id::ObjectId;
 use crate::data::track::{Track, TrackId};
 use crate::db::search_result::SearchResult;
+use gtk4::glib;
 use itertools::Itertools;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Index;
@@ -11,7 +12,7 @@ use std::sync::{Arc, RwLock};
 use ustr::Ustr;
 
 #[derive(Default)]
-pub struct Database {
+pub struct Subdatabase {
     pub tracks: HashMap<TrackId, Track>,
     pub albums: HashMap<AlbumId, Album>,
     pub years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
@@ -19,7 +20,7 @@ pub struct Database {
     pub genres: BTreeMap<Option<Ustr>, Genre>,
 }
 
-impl Database {
+impl Subdatabase {
     pub fn has_track(&self, track_id: TrackId) -> bool {
         self.tracks.contains_key(&track_id)
     }
@@ -31,11 +32,14 @@ impl Database {
     }
 
     pub fn sorted_tracks_of_album(&self, album_id: AlbumId) -> Vec<TrackId> {
-        let mut tracks = self[album_id].unordered_tracks.clone();
-        tracks.sort_by_key(|t| self[*t].title_sort);
-        tracks.extend(self[album_id].tracks.values());
-
-        tracks
+        if let Some(album) = self.albums.get(&album_id) {
+            let mut tracks = album.unordered_tracks.clone();
+            tracks.sort_by_key(|t| self[*t].title_sort);
+            tracks.extend(self[album_id].tracks.values());
+            tracks
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn sorted_albums(&self) -> Vec<AlbumId> {
@@ -45,32 +49,41 @@ impl Database {
     }
 
     pub fn sorted_albums_of_artist(&self, artist_id: ArtistId) -> Vec<AlbumId> {
-        let mut albums = self[artist_id]
-            .albums
-            .iter()
-            .map(|a| (*a, self[*a].title_sort))
-            .collect_vec();
-        albums.sort_by_key(|a| a.1);
-        albums.into_iter().map(|a| a.0).collect_vec()
+        if let Some(artist) = self.artists.get(&artist_id) {
+            let mut albums = artist
+                .albums
+                .iter()
+                .map(|a| (*a, self[*a].title_sort))
+                .collect_vec();
+            albums.sort_by_key(|a| a.1);
+            albums.into_iter().map(|a| a.0).collect_vec()
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn sorted_albums_of_year(&self, year: Option<u16>) -> Vec<AlbumId> {
-        let mut albums = self.years[&year]
-            .iter()
-            .map(|a| (*a, self[*a].title_sort))
-            .collect_vec();
-        albums.sort_by_key(|a| a.1);
-        albums.into_iter().map(|a| a.0).collect_vec()
+        if let Some(year) = self.years.get(&year) {
+            let mut albums = year.iter().map(|a| (*a, self[*a].title_sort)).collect_vec();
+            albums.sort_by_key(|a| a.1);
+            albums.into_iter().map(|a| a.0).collect_vec()
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn sorted_albums_of_genre(&self, genre: Option<Ustr>) -> Vec<AlbumId> {
-        let mut albums = self.genres[&genre]
-            .albums
-            .iter()
-            .map(|a| (*a, self[*a].title_sort))
-            .collect_vec();
-        albums.sort_by_key(|a| a.1);
-        albums.into_iter().map(|a| a.0).collect_vec()
+        if let Some(genre) = self.genres.get(&genre) {
+            let mut albums = genre
+                .albums
+                .iter()
+                .map(|a| (*a, self[*a].title_sort))
+                .collect_vec();
+            albums.sort_by_key(|a| a.1);
+            albums.into_iter().map(|a| a.0).collect_vec()
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn sorted_artists(&self) -> Vec<ArtistId> {
@@ -80,13 +93,17 @@ impl Database {
     }
 
     pub fn sorted_artists_of_genre(&self, genre: Option<Ustr>) -> Vec<ArtistId> {
-        let mut artists = self.genres[&genre]
-            .artists
-            .iter()
-            .map(|a| (*a, self[*a].sort))
-            .collect_vec();
-        artists.sort_by_key(|a| a.1);
-        artists.into_iter().map(|a| a.0).collect_vec()
+        if let Some(genre) = self.genres.get(&genre) {
+            let mut artists = genre
+                .artists
+                .iter()
+                .map(|a| (*a, self[*a].sort))
+                .collect_vec();
+            artists.sort_by_key(|a| a.1);
+            artists.into_iter().map(|a| a.0).collect_vec()
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn sorted_years(&self) -> impl Iterator<Item = Option<u16>> {
@@ -94,29 +111,29 @@ impl Database {
     }
 
     pub fn sorted_years_of_artist(&self, artist_id: ArtistId) -> Vec<Option<u16>> {
-        let mut years = self[artist_id]
-            .albums
-            .iter()
-            .map(|a| self[*a].year)
-            .collect_vec();
+        if let Some(artist) = self.artists.get(&artist_id) {
+            let mut years = artist.albums.iter().map(|a| self[*a].year).collect_vec();
 
-        years.sort_unstable();
-        years.dedup();
+            years.sort_unstable();
+            years.dedup();
 
-        years
+            years
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn sorted_years_of_genre(&self, genre: Option<Ustr>) -> Vec<Option<u16>> {
-        let mut years = self.genres[&genre]
-            .albums
-            .iter()
-            .map(|a| self[*a].year)
-            .collect_vec();
+        if let Some(genre) = self.genres.get(&genre) {
+            let mut years = genre.albums.iter().map(|a| self[*a].year).collect_vec();
 
-        years.sort_unstable();
-        years.dedup();
+            years.sort_unstable();
+            years.dedup();
 
-        years
+            years
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn sorted_genres(&self) -> impl Iterator<Item = Option<Ustr>> {
@@ -257,7 +274,7 @@ impl Database {
     }
 }
 
-impl Index<TrackId> for Database {
+impl Index<TrackId> for Subdatabase {
     type Output = Track;
 
     fn index(&self, index: TrackId) -> &Self::Output {
@@ -265,7 +282,7 @@ impl Index<TrackId> for Database {
     }
 }
 
-impl Index<AlbumId> for Database {
+impl Index<AlbumId> for Subdatabase {
     type Output = Album;
 
     fn index(&self, index: AlbumId) -> &Self::Output {
@@ -273,7 +290,7 @@ impl Index<AlbumId> for Database {
     }
 }
 
-impl Index<ArtistId> for Database {
+impl Index<ArtistId> for Subdatabase {
     type Output = Artist;
 
     fn index(&self, index: ArtistId) -> &Self::Output {
@@ -281,9 +298,75 @@ impl Index<ArtistId> for Database {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Default, Copy, Clone, glib::Enum)]
+#[enum_type(name = "AvailableDatabases")]
+pub enum AvailableDatabases {
+    #[default]
+    Music,
+    Books,
+}
+
+#[derive(Default)]
+pub struct Database {
+    pub music: Subdatabase,
+    pub books: Subdatabase,
+}
+
 impl Database {
-    pub fn new() -> Database {
-        Default::default()
+    pub fn get_subdb(&self, db: AvailableDatabases) -> &Subdatabase {
+        match db {
+            AvailableDatabases::Music => &self.music,
+            AvailableDatabases::Books => &self.books,
+        }
+    }
+
+    pub fn any_has_track(&self, track_id: TrackId) -> bool {
+        self.music.has_track(track_id) || self.books.has_track(track_id)
+    }
+
+    pub fn get_track(&self, track_id: TrackId) -> Option<&Track> {
+        self.music
+            .tracks
+            .get(&track_id)
+            .or_else(|| self.books.tracks.get(&track_id))
+    }
+
+    pub fn get_artist(&self, artist_id: ArtistId) -> Option<&Artist> {
+        self.music
+            .artists
+            .get(&artist_id)
+            .or_else(|| self.books.artists.get(&artist_id))
+    }
+
+    pub fn get_album(&self, album_id: AlbumId) -> Option<&Album> {
+        self.music
+            .albums
+            .get(&album_id)
+            .or_else(|| self.books.albums.get(&album_id))
+    }
+
+    pub fn all_sorted_tracks_of_album(&self, album_id: AlbumId) -> Vec<TrackId> {
+        let mut ret = self.music.sorted_tracks_of_album(album_id);
+        ret.append(&mut self.books.sorted_tracks_of_album(album_id));
+        ret
+    }
+
+    pub fn all_sorted_albums_of_artist(&self, artist_id: ArtistId) -> Vec<AlbumId> {
+        let mut ret = self.music.sorted_albums_of_artist(artist_id);
+        ret.append(&mut self.books.sorted_albums_of_artist(artist_id));
+        ret
+    }
+
+    pub fn all_sorted_albums_of_year(&self, year: Option<u16>) -> Vec<AlbumId> {
+        let mut ret = self.music.sorted_albums_of_year(year);
+        ret.append(&mut self.books.sorted_albums_of_year(year));
+        ret
+    }
+
+    pub fn all_sorted_albums_of_genre(&self, genre: Option<Ustr>) -> Vec<AlbumId> {
+        let mut ret = self.music.sorted_albums_of_genre(genre);
+        ret.append(&mut self.books.sorted_albums_of_genre(genre));
+        ret
     }
 }
 

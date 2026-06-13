@@ -1,9 +1,7 @@
 use crate::data::album::AlbumId;
 use crate::data::artist::ArtistId;
 use crate::data::track::TrackId;
-use std::cell::RefCell;
 use std::collections::HashSet;
-use std::rc::Rc;
 use ustr::Ustr;
 
 /// None means full set
@@ -52,5 +50,3 @@ impl SearchResult {
             .unwrap_or(true)
     }
 }
-
-pub type SearchResultPtr = Rc<RefCell<SearchResult>>;
