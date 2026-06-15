@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-13 21:04+0200\n"
+"POT-Creation-Date: 2026-06-15 23:49+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -91,11 +91,13 @@ msgstr "Zakończ"
 #: src/media_library/grouping_mode.rs:44 src/media_library/grouping_mode.rs:62
 #: src/data/grouping_mode.rs:22 src/data/grouping_mode.rs:40
 #: src/data/grouping_mode.rs:23 src/data/grouping_mode.rs:41
+#: src/data/grouping_mode.rs:23 src/data/grouping_mode.rs:41
 msgid "none"
 msgstr "brak"
 
 #: src/media_library/grouping_mode.rs:45 src/media_library/grouping_mode.rs:63
 #: src/data/grouping_mode.rs:23 src/data/grouping_mode.rs:41
+#: src/data/grouping_mode.rs:24 src/data/grouping_mode.rs:42
 #: src/data/grouping_mode.rs:24 src/data/grouping_mode.rs:42
 msgid "album"
 msgstr "Album"
@@ -103,11 +105,13 @@ msgstr "Album"
 #: src/media_library/grouping_mode.rs:46 src/media_library/grouping_mode.rs:64
 #: src/data/grouping_mode.rs:24 src/data/grouping_mode.rs:42
 #: src/data/grouping_mode.rs:25 src/data/grouping_mode.rs:43
+#: src/data/grouping_mode.rs:25 src/data/grouping_mode.rs:43
 msgid "artist-album"
 msgstr "Artysta / Album"
 
 #: src/media_library/grouping_mode.rs:47 src/media_library/grouping_mode.rs:65
 #: src/data/grouping_mode.rs:25 src/data/grouping_mode.rs:43
+#: src/data/grouping_mode.rs:26 src/data/grouping_mode.rs:44
 #: src/data/grouping_mode.rs:26 src/data/grouping_mode.rs:44
 msgid "artist-year-album"
 msgstr "Artysta / Rok/ Album"
@@ -115,11 +119,13 @@ msgstr "Artysta / Rok/ Album"
 #: src/media_library/grouping_mode.rs:48 src/media_library/grouping_mode.rs:66
 #: src/data/grouping_mode.rs:26 src/data/grouping_mode.rs:44
 #: src/data/grouping_mode.rs:27 src/data/grouping_mode.rs:45
+#: src/data/grouping_mode.rs:27 src/data/grouping_mode.rs:45
 msgid "genre-album"
 msgstr "Gatunek / Album"
 
 #: src/media_library/grouping_mode.rs:49 src/media_library/grouping_mode.rs:67
 #: src/data/grouping_mode.rs:27 src/data/grouping_mode.rs:45
+#: src/data/grouping_mode.rs:28 src/data/grouping_mode.rs:46
 #: src/data/grouping_mode.rs:28 src/data/grouping_mode.rs:46
 msgid "genre-year-album"
 msgstr "Gatunek / Rok / Album"
@@ -127,11 +133,13 @@ msgstr "Gatunek / Rok / Album"
 #: src/media_library/grouping_mode.rs:51 src/media_library/grouping_mode.rs:68
 #: src/data/grouping_mode.rs:29 src/data/grouping_mode.rs:46
 #: src/data/grouping_mode.rs:30 src/data/grouping_mode.rs:47
+#: src/data/grouping_mode.rs:30 src/data/grouping_mode.rs:47
 msgid "genre-artist-album"
 msgstr "Gatunek / Artysta / Album"
 
 #: src/media_library/grouping_mode.rs:54 src/media_library/grouping_mode.rs:69
 #: src/data/grouping_mode.rs:32 src/data/grouping_mode.rs:47
+#: src/data/grouping_mode.rs:33 src/data/grouping_mode.rs:48
 #: src/data/grouping_mode.rs:33 src/data/grouping_mode.rs:48
 msgid "year-album"
 msgstr "Rok / Album"
@@ -181,10 +189,22 @@ msgstr "Zupełnie losowo"
 msgid "setting-permutation"
 msgstr "Permutacja"
 
-#: src/resources/window.ui:73
+#: src/resources/window.ui:73 src/resources/window.ui:84
 msgid "tab-music"
 msgstr "Muzyka"
 
-#: src/resources/window.ui:86
+#: src/resources/window.ui:86 src/resources/window.ui:97
 msgid "tab-books"
 msgstr "Książki"
+
+#: src/resources/window.ui:71
+msgid "tab-info"
+msgstr "O utworze"
+
+#: src/resources/info_panel.ui:13
+msgid "info-no-file"
+msgstr "Brak utworu"
+
+#: src/resources/info_panel.ui:14
+msgid "info-play-something"
+msgstr "Odtwórz cokolwiek by zobaczyć szczegóły"

@@ -61,9 +61,6 @@ mod imp {
 
         #[template_child]
         pub media_library: TemplateChild<MediaLibraryUi>,
-        // pub database: RefCell<Option<DatabasePtr>>,
-        // pub search_result: RefCell<Option<SearchResultPtr>>,
-        // pub grouping_mode: RefCell<Option<GroupingModePtr>>,
     }
 
     #[glib::object_subclass]

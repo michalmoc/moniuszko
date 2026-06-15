@@ -4,5 +4,6 @@
         <file compressed="true" preprocess="xml-stripblanks">window.ui</file>
         <file compressed="true" preprocess="xml-stripblanks">preferences.ui</file>
         <file compressed="true" preprocess="xml-stripblanks">media_panel.ui</file>
+        <file compressed="true" preprocess="xml-stripblanks">info_panel.ui</file>
     </gresource>
 </gresources>

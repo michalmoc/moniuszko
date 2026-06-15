@@ -61,6 +61,17 @@
                         <child type="start">
                             <object class="GtkNotebook">
                                 <child>
+                                    <object class="InfoPanel" id="info_panel">
+                                        <property name="current" bind-source="playback" bind-property="current"
+                                                  bind-flags="sync-create"/>
+                                    </object>
+                                </child>
+                                <child type="tab">
+                                    <object class="GtkLabel">
+                                        <property name="label" translatable="yes">tab-info</property>
+                                    </object>
+                                </child>
+                                <child>
                                     <object class="MediaPanel" id="media_panel_music">
                                         <signal name="activate" handler="handle_library_activate" swapped="true"/>
                                         <signal name="refresh" handler="handle_refresh" swapped="true"/>

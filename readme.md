@@ -4,16 +4,18 @@ Yet another music player. See [Vision](#vision).
 
 ## Status
 
-Usable but many features still planned. See [Roadmap](#roadmap).
+Mostly ready, see [Roadmap](#roadmap).
 
 Warning: first scan may be slow, because of fetching data from musicbrainz.
 
 ## Building
 
 for development:
+
 ```cargo build```
 
-for install
+for install copy `.mo` files from `assets/gettext` to `/usr/share/locale` and build with
+
 ```LOCALE_DIR=/usr/share/locale cargo build --release```
 
 ## Vision
@@ -33,10 +35,6 @@ Why?
 
 ## Roadmap
 
-for 1.2:
-
-- panel with details of current piece (including lyrics)
-
 for 1.3:
 
 - many playlists
@@ -53,6 +51,8 @@ other:
 - search should ignore letter case
 - publish as rust crate
 - publish on AUR
+- complete mpris
+- add more data to info panel
 
 # Contributions
 

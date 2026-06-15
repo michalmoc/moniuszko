@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="moniuszko">
+    <template class="InfoPanel">
+        <child>
+            <object class="GtkStack" id="info_stack">
+                <child>
+                    <object class="GtkStackPage">
+                        <property name="name">placeholder</property>
+                        <property name="title">In the beginning…</property>
+                        <property name="child">
+                            <object class="AdwStatusPage">
+                                <property name="icon-name">audio-headphones-symbolic</property>
+                                <property name="title" translatable="yes">info-no-file</property>
+                                <property name="description" translatable="yes">info-play-something</property>
+                            </object>
+                        </property>
+                    </object>
+                </child>
+                <child>
+                    <object class="GtkStackPage">
+                        <property name="name">main</property>
+                        <property name="title">In the beginning…</property>
+                        <property name="child">
+                            <object class="GtkScrolledWindow">
+                                <child>
+                                    <object class="GtkBox">
+                                        <property name="spacing">10</property>
+                                        <property name="orientation">vertical</property>
+                                        <child>
+                                            <object class="GtkLabel" id="title">
+                                                <property name="selectable">true</property>
+                                                <property name="halign">start</property>
+                                                <property name="wrap">true</property>
+                                                <style><class name="title-1"/></style>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkLabel" id="album">
+                                                <property name="selectable">true</property>
+                                                <property name="halign">start</property>
+                                                <style><class name="title-2"/></style>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkLabel" id="track_artists">
+                                                <property name="selectable">true</property>
+                                                <property name="halign">start</property>
+                                                <style><class name="title-2"/></style>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkImage" id="cover">
+                                                <property name="pixel-size">500</property>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkLabel" id="lyrics">
+                                                <property name="selectable">true</property>
+                                                <property name="halign">start</property>
+                                                <style><class name="document"/></style>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+                            </object>
+                        </property>
+                    </object>
+                </child>
+            </object>
+        </child>
+    </template>
+</interface>

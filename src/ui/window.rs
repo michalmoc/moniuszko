@@ -70,6 +70,7 @@ mod imp {
     use crate::data::object_id::{ObjectId, ObjectIds};
     use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
     use crate::db::database::DatabasePtr;
+    use crate::ui::info_panel::InfoPanel;
     use crate::ui::media_panel::MediaPanel;
     use crate::ui::player::PlayerUi;
     use crate::ui::playlist::PlaylistUi;
@@ -96,6 +97,9 @@ mod imp {
     #[derive(CompositeTemplate, Default)]
     #[template(resource = "/org/moniuszko/window.ui")]
     pub struct Window {
+        #[template_child]
+        pub info_panel: TemplateChild<InfoPanel>,
+
         #[template_child]
         pub media_panel_music: TemplateChild<MediaPanel>,
 
@@ -196,6 +200,8 @@ mod imp {
             self.media_panel_music.repopulate();
             self.media_panel_books.bind_data(database.clone());
             self.media_panel_books.repopulate();
+
+            self.info_panel.bind_data(database.clone());
 
             self.bound_data.replace(Some(BoundData {
                 commands,
