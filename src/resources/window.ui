@@ -151,8 +151,6 @@
                                                 <signal name="ended"
                                                         handler="handle_ended"
                                                         swapped="true"/>
-
-                                                <property name="volume">1.0</property>
                                             </object>
                                         </property>
                                     </object>

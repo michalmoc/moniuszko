@@ -39,6 +39,7 @@ mod imp {
     use gtk4::prelude::{BoxExt, ButtonExt, CastNone, OrientableExt, RangeExt, WidgetExt};
     use gtk4::subclass::prelude::*;
     use gtk4::{Adjustment, Button, Label, Orientation, Scale, ScaleButton, Widget, glib};
+    use log::info;
     use std::cell::RefCell;
     use std::sync::OnceLock;
 
@@ -156,7 +157,7 @@ mod imp {
     }
 
     fn timestamp_to_text(_: &Binding, n: i64) -> Option<String> {
-        Some(format!("{:0>2}:{:0>2}", n / 60000000, n / 1000000 % 60))
+        Some(format!("{:0>2}:{:0>2}", n / 60000, n / 1000 % 60))
     }
 
     fn new_control_box(this: &super::PlayerUi, playback_state: &PlaybackState) -> Widget {

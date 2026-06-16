@@ -19,7 +19,7 @@ use std::fs;
 use std::fs::File;
 use std::ops::Deref;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ModifyPlaylistCommand {
     Clear,
     Remove(PlaylistEntryUuids),
@@ -77,6 +77,7 @@ impl ModifyPlaylistCommand {
     }
 }
 
+#[derive(Debug)]
 pub enum Command {
     Raise,
     HideShow,
@@ -116,8 +117,8 @@ pub async fn process_commands(
     let mut random_data = RandomData::sattolo(playlist.len());
     reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
 
-    loop {
-        match queue.recv().await.unwrap() {
+    while let Ok(command) = queue.recv().await {
+        match command {
             Command::Raise => {
                 window.present();
             }

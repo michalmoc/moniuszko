@@ -4,6 +4,7 @@ use crate::db::database::Database;
 use crate::ui::playlist_item::PlaylistItem;
 use gio::prelude::{ListModelExt, ListModelExtManual};
 use gtk4::prelude::{Cast, CastNone};
+use log::warn;
 use std::fs;
 
 #[derive(Clone)]
@@ -89,7 +90,7 @@ fn save_playlist(store: &gio::ListStore, config: &ConfigPtr) {
     fs::create_dir_all(config.playlists_path().parent().unwrap()).unwrap();
     match fs::File::create(config.playlists_path()) {
         Err(e) => {
-            println!("Error creating playlist file: {}", e);
+            warn!("Error creating playlist file: {}", e);
         }
         Ok(file) => {
             let playlist: Vec<TrackId> = store

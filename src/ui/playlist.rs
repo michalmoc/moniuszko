@@ -37,6 +37,7 @@ mod imp {
         Label, ListScrollFlags, MultiSelection, PickFlags, SelectionModel, Shortcut,
         ShortcutController, SignalListItemFactory, Widget, gdk, glib,
     };
+    use log::error;
     use std::cell::RefCell;
     use std::sync::OnceLock;
 
@@ -290,7 +291,7 @@ mod imp {
                 index + 1
             }
         } else {
-            println!("unknown type {}", closest.type_());
+            error!("unknown type {}", closest.type_());
             return false;
         };
 

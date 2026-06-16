@@ -25,6 +25,9 @@ ksni = { version = "0.3.4", default-features = false, features = ["async-io"] }
 image = "0.25.10"
 gettext-rs = { version = "0.7.7", features = ["gettext-system"] }
 rand_pcg = "0.10.2"
+rodio = { git = "https://github.com/RustAudio/rodio.git" }
+env_logger = "0.11.10"
+log = "0.4.32"
 
 [build-dependencies]
 glib-build-tools = "0.22.0"

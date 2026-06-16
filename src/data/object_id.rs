@@ -41,7 +41,7 @@ impl From<Option<u16>> for ObjectId {
     }
 }
 
-#[derive(Default, Clone, glib::Boxed)]
+#[derive(Default, Clone, glib::Boxed, Debug)]
 #[boxed_type(name = "ObjectIds")]
 pub struct ObjectIds(Vec<ObjectId>);
 

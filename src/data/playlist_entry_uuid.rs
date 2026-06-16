@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use uuid::Uuid;
 
-#[derive(glib::Boxed, Copy, Clone, Eq, PartialEq, Default, Hash)]
+#[derive(glib::Boxed, Copy, Clone, Eq, PartialEq, Default, Hash, Debug)]
 #[boxed_type(name = "PlaylistEntryUuid")]
 pub struct PlaylistEntryUuid(Uuid);
 
@@ -20,7 +20,7 @@ impl Display for PlaylistEntryUuid {
     }
 }
 
-#[derive(glib::Boxed, Clone, Eq, PartialEq, Default)]
+#[derive(glib::Boxed, Clone, Eq, PartialEq, Default, Debug)]
 #[boxed_type(name = "PlaylistEntryUuids")]
 pub struct PlaylistEntryUuids(HashSet<PlaylistEntryUuid>);
 

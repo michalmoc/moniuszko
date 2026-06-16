@@ -11,6 +11,7 @@ use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::picture::PictureType;
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::create_dir_all;
@@ -40,7 +41,7 @@ impl Scanner {
         create_dir_all(config.covers_path()).unwrap();
 
         let files = self.files_database.scan(path);
-        println!(
+        info!(
             "unchanged: {}, modified: {}, deleted: {}, new: {}",
             files.unchanged.len(),
             files.modified.len(),

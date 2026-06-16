@@ -19,7 +19,6 @@ mod imp {
     use crate::db::database::DatabasePtr;
     use crate::ui::playlist_item::PlaylistItem;
     use adw::glib::subclass::InitializingObject;
-    use anyhow::anyhow;
     use gtk4::gdk::Texture;
     use gtk4::glib::Properties;
     use gtk4::prelude::ObjectExt;

@@ -92,6 +92,7 @@ mod imp {
     };
     use gtk4::subclass::window::WindowImpl;
     use gtk4::{CompositeTemplate, TemplateChild, glib, template_callbacks};
+    use log::error;
     use std::cell::RefCell;
 
     #[derive(CompositeTemplate, Default)]
@@ -295,7 +296,7 @@ mod imp {
                 cfg.window_maximized = obj.is_maximized();
 
                 if let Err(e) = cfg.save() {
-                    println!("Error saving config: {}", e);
+                    error!("Error saving config: {}", e);
                 }
             }
 

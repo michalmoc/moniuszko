@@ -35,6 +35,7 @@ pub fn set_global_locale_gettext() {
 
 fn main() -> glib::ExitCode {
     set_global_locale_gettext();
+    env_logger::init();
 
     gio::resources_register_include!("moniuszko.gresource").expect("Failed to register resources.");
 
