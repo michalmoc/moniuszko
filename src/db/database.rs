@@ -4,8 +4,10 @@ use crate::data::genre::Genre;
 use crate::data::object_id::ObjectId;
 use crate::data::track::{Track, TrackId};
 use crate::db::search_result::SearchResult;
+use crate::languages::COLLATOR;
 use gtk4::glib;
 use itertools::Itertools;
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Index;
 use std::sync::{Arc, RwLock};
@@ -20,6 +22,19 @@ pub struct Subdatabase {
     pub genres: BTreeMap<Option<Ustr>, Genre>,
 }
 
+fn cmp(a: &str, b: &str) -> Ordering {
+    COLLATOR.wait().compare(a, b)
+}
+
+fn cmp_o<T: AsRef<str>>(a: &Option<T>, b: &Option<T>) -> Ordering {
+    match (a, b) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(a), Some(b)) => cmp(a.as_ref(), b.as_ref()),
+    }
+}
+
 impl Subdatabase {
     pub fn has_track(&self, track_id: TrackId) -> bool {
         self.tracks.contains_key(&track_id)
@@ -27,14 +42,18 @@ impl Subdatabase {
 
     pub fn sorted_tracks(&self) -> Vec<TrackId> {
         let mut tracks = self.tracks.iter().collect_vec();
-        tracks.sort_by_key(|(_, t)| t.title_sort);
+        tracks.sort_by(|(_, t1), (_, t2)| cmp(&t1.title_sort, &t2.title_sort));
         tracks.into_iter().map(|(id, _)| *id).collect()
     }
 
     pub fn sorted_tracks_of_album(&self, album_id: AlbumId) -> Vec<TrackId> {
         if let Some(album) = self.albums.get(&album_id) {
             let mut tracks = album.unordered_tracks.clone();
-            tracks.sort_by_key(|t| self[*t].title_sort);
+            tracks.sort_by(|t1, t2| {
+                COLLATOR
+                    .wait()
+                    .compare(&self[*t1].title_sort, &self[*t2].title_sort)
+            });
             tracks.extend(self[album_id].tracks.values());
             tracks
         } else {
@@ -44,7 +63,7 @@ impl Subdatabase {
 
     pub fn sorted_albums(&self) -> Vec<AlbumId> {
         let mut albums = self.albums.iter().collect_vec();
-        albums.sort_by_key(|(_, t)| t.title_sort);
+        albums.sort_by(|(_, t1), (_, t2)| cmp(&t1.title_sort, &t2.title_sort));
         albums.into_iter().map(|(id, _)| *id).collect()
     }
 
@@ -55,7 +74,7 @@ impl Subdatabase {
                 .iter()
                 .map(|a| (*a, self[*a].title_sort))
                 .collect_vec();
-            albums.sort_by_key(|a| a.1);
+            albums.sort_by(|a, b| cmp(&a.1, &b.1));
             albums.into_iter().map(|a| a.0).collect_vec()
         } else {
             Vec::new()
@@ -65,7 +84,7 @@ impl Subdatabase {
     pub fn sorted_albums_of_year(&self, year: Option<u16>) -> Vec<AlbumId> {
         if let Some(year) = self.years.get(&year) {
             let mut albums = year.iter().map(|a| (*a, self[*a].title_sort)).collect_vec();
-            albums.sort_by_key(|a| a.1);
+            albums.sort_by(|a, b| cmp(&a.1, &b.1));
             albums.into_iter().map(|a| a.0).collect_vec()
         } else {
             Vec::new()
@@ -79,7 +98,7 @@ impl Subdatabase {
                 .iter()
                 .map(|a| (*a, self[*a].title_sort))
                 .collect_vec();
-            albums.sort_by_key(|a| a.1);
+            albums.sort_by(|a, b| cmp(&a.1, &b.1));
             albums.into_iter().map(|a| a.0).collect_vec()
         } else {
             Vec::new()
@@ -88,7 +107,7 @@ impl Subdatabase {
 
     pub fn sorted_artists(&self) -> Vec<ArtistId> {
         let mut artists = self.artists.iter().collect_vec();
-        artists.sort_by_key(|(_, a)| a.sort);
+        artists.sort_by(|(_, a), (_, b)| cmp_o(&a.sort, &b.sort));
         artists.into_iter().map(|(id, _)| *id).collect()
     }
 
@@ -99,7 +118,7 @@ impl Subdatabase {
                 .iter()
                 .map(|a| (*a, self[*a].sort))
                 .collect_vec();
-            artists.sort_by_key(|a| a.1);
+            artists.sort_by(|a, b| cmp_o(&a.1, &b.1));
             artists.into_iter().map(|a| a.0).collect_vec()
         } else {
             Vec::new()
@@ -136,8 +155,10 @@ impl Subdatabase {
         }
     }
 
-    pub fn sorted_genres(&self) -> impl Iterator<Item = Option<Ustr>> {
-        self.genres.keys().copied()
+    pub fn sorted_genres(&self) -> Vec<Option<Ustr>> {
+        let mut genres = self.genres.keys().copied().collect_vec();
+        genres.sort_by(cmp_o);
+        genres
     }
 
     pub fn track_matches_filter(&self, track_id: TrackId, filter: &Vec<ObjectId>) -> bool {

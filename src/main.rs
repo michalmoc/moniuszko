@@ -3,6 +3,7 @@ mod constants;
 pub mod control;
 mod data;
 mod db;
+mod languages;
 mod ui;
 
 use crate::config::{Config, ConfigPtr};
@@ -12,8 +13,8 @@ use crate::control::mpris::mpris;
 use crate::control::tray::run_tray;
 use crate::db::database::DatabasePtr;
 use crate::db::scan::{Scanner, ScannerPtr};
+use crate::languages::{init_collator, set_global_locale_gettext};
 use crate::ui::window::Window;
-use gettextrs::{LocaleCategory, bind_textdomain_codeset, bindtextdomain, setlocale, textdomain};
 use gtk::glib;
 use gtk::prelude::*;
 use gtk4 as gtk;
@@ -22,20 +23,11 @@ use gtk4::gdk::Display;
 use std::fs::File;
 use std::sync::{Arc, RwLock};
 
-pub fn set_global_locale_gettext() {
-    let locale_dir =
-        option_env!("LOCALE_DIR").unwrap_or(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/gettext"));
-
-    setlocale(LocaleCategory::LcAll, "");
-    bindtextdomain("moniuszko", locale_dir).expect("Unable to bind the text domain");
-
-    bind_textdomain_codeset("moniuszko", "UTF-8").expect("Unable to set text domain encoding");
-    textdomain("moniuszko").expect("Unable to switch to the text domain");
-}
-
 fn main() -> glib::ExitCode {
-    set_global_locale_gettext();
     env_logger::init();
+
+    set_global_locale_gettext();
+    init_collator();
 
     gio::resources_register_include!("moniuszko.gresource").expect("Failed to register resources.");
 
