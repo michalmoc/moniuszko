@@ -21,6 +21,7 @@ pub struct FileData {
 
     pub album: AlbumIdentification,
     pub cd: Option<u32>,
+    pub max_cd: Option<u32>,
     pub position: Option<u32>,
 
     pub album_artists: Option<Ustr>,

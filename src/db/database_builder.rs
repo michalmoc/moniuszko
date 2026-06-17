@@ -68,6 +68,7 @@ impl DatabaseBuilder {
                 album,
                 position: data.position,
                 cd: data.cd,
+                max_cd: data.max_cd,
                 duration: data.duration,
                 artists: data.track_artists,
                 artist_ids: found_artists.track,

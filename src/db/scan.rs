@@ -161,7 +161,8 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
                         title: stem.to_string_lossy().into(),
                         title_sort: stem.to_string_lossy().into(),
                         album: AlbumIdentification::None,
-                        cd: Default::default(),
+                        cd: None,
+                        max_cd: None,
                         position: Default::default(),
                         album_artists: Default::default(),
                         album_artists_sort: Default::default(),
@@ -219,6 +220,7 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
 
     let position = tag.track();
     let cd = tag.disk();
+    let max_cd = tag.disk_total();
 
     let album_artists = tag.get_string(ItemKey::AlbumArtist).map(|s| Ustr::from(&s));
     let album_artists_sort = tag
@@ -252,6 +254,7 @@ fn scan_file(path: &Path, id: Option<TrackId>) -> anyhow::Result<FileData> {
         title_sort,
         album,
         cd,
+        max_cd,
         position,
         album_artists,
         album_artists_sort,

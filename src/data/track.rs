@@ -27,6 +27,7 @@ pub struct Track {
 
     pub album: AlbumId,
     pub cd: Option<u32>,
+    pub max_cd: Option<u32>,
     pub position: Option<u32>,
 
     pub artists: Option<Ustr>,

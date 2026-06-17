@@ -44,7 +44,6 @@ for 1.3:
 other:
 
 - add screenshots here
-- show cd if max cd > 1 in # column
 - save library grouping mode and repeat mode
 - Unicode aware sorting
 - search should ignore letter case

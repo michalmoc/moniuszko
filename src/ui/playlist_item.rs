@@ -76,8 +76,16 @@ impl PlaylistItem {
     pub fn set_data(&self, database: &Database) {
         let track = database.get_track(self.stored_track()).unwrap();
 
+        let position = match (track.max_cd, track.cd, track.position) {
+            (Some(max_cd), Some(cd), Some(position)) if max_cd > 1 => {
+                Some(format!("{}.{}", cd, position))
+            }
+            (_, _, Some(position)) => Some(format!("{}", position)),
+            (_, _, _) => None,
+        };
+
         self.set_path(track.path.clone());
-        self.set_position(track.position.map(|n| n.to_string()));
+        self.set_position(position);
         self.set_name(track.title.to_string());
         self.set_album(database.get_album(track.album).unwrap().title.to_string());
         self.set_artists(track.artists.map(|s| s.to_string()).unwrap_or_default());
