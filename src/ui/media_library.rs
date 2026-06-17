@@ -263,10 +263,15 @@ mod imp {
             ObjectId::AlbumId(_) => {
                 let image = Image::new();
                 image.add_css_class("large-icons");
-                dataobj
-                    .bind_property("image", &image, "file")
-                    .sync_create()
-                    .build();
+
+                if dataobj.image().is_some() {
+                    dataobj
+                        .bind_property("image", &image, "file")
+                        .sync_create()
+                        .build();
+                } else {
+                    image.set_icon_name(Some("media-optical-symbolic"));
+                }
 
                 let box_ = gtk4::Box::new(Orientation::Horizontal, 10);
                 box_.append(&image);

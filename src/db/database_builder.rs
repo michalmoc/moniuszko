@@ -45,7 +45,7 @@ impl DatabaseBuilder {
         path: &Path,
         data: &FileData,
         music_brainz: &mut MusicBrainz,
-        covers: &HashMap<AlbumIdentification, Ustr>,
+        covers: &HashMap<AlbumIdentification, Option<Ustr>>,
     ) {
         let found_artists = self.find_artists(music_brainz, data);
 
@@ -131,7 +131,7 @@ impl DatabaseBuilder {
     fn find_album(
         &mut self,
         data: &FileData,
-        covers: &HashMap<AlbumIdentification, Ustr>,
+        covers: &HashMap<AlbumIdentification, Option<Ustr>>,
     ) -> AlbumId {
         let album = if let Some(album_id) = self.known_albums.get(&data.album) {
             *album_id

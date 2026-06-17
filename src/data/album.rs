@@ -20,5 +20,5 @@ pub struct Album {
     pub unordered_tracks: Vec<TrackId>,
     pub tracks: BTreeMap<(u32, u32), TrackId>,
 
-    pub cover: Ustr,
+    pub cover: Option<Ustr>,
 }

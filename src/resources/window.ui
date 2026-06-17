@@ -60,6 +60,7 @@
 
                         <child type="start">
                             <object class="GtkNotebook">
+                                <property name="show-border">false</property>
                                 <child>
                                     <object class="InfoPanel" id="info_panel">
                                         <property name="current" bind-source="playback" bind-property="current"

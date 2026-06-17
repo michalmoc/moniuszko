@@ -39,7 +39,6 @@ mod imp {
     use gtk4::prelude::{BoxExt, ButtonExt, CastNone, OrientableExt, RangeExt, WidgetExt};
     use gtk4::subclass::prelude::*;
     use gtk4::{Adjustment, Button, Label, Orientation, Scale, ScaleButton, Widget, glib};
-    use log::info;
     use std::cell::RefCell;
     use std::sync::OnceLock;
 

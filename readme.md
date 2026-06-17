@@ -43,7 +43,6 @@ for 1.3:
 
 other:
 
-- real placeholder album image
 - add screenshots here
 - show cd if max cd > 1 in # column
 - save library grouping mode and repeat mode

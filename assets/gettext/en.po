@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-15 23:49+0200\n"
+"POT-Creation-Date: 2026-06-17 11:22+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -88,27 +88,27 @@ msgid "tray-exit"
 msgstr "Quit"
 
 #: src/playlist/ui.rs:194 src/ui/playlist.rs:163 src/ui/playlist.rs:154
-#: src/ui/playlist.rs:154
+#: src/ui/playlist.rs:155
 msgid "column-track"
 msgstr "#"
 
 #: src/playlist/ui.rs:195 src/ui/playlist.rs:164 src/ui/playlist.rs:155
-#: src/ui/playlist.rs:155
+#: src/ui/playlist.rs:156
 msgid "column-title"
 msgstr "Title"
 
 #: src/playlist/ui.rs:196 src/ui/playlist.rs:165 src/ui/playlist.rs:156
-#: src/ui/playlist.rs:156
+#: src/ui/playlist.rs:157
 msgid "column-artists"
 msgstr "Artist"
 
 #: src/playlist/ui.rs:197 src/ui/playlist.rs:166 src/ui/playlist.rs:157
-#: src/ui/playlist.rs:157
+#: src/ui/playlist.rs:158
 msgid "column-album"
 msgstr "Album"
 
 #: src/playlist/ui.rs:198 src/ui/playlist.rs:167 src/ui/playlist.rs:158
-#: src/ui/playlist.rs:158
+#: src/ui/playlist.rs:159
 msgid "column-duration"
 msgstr "Length"
 
@@ -189,21 +189,39 @@ msgid "setting-permutation"
 msgstr "Permutation"
 
 #: src/resources/window.ui:73 src/resources/window.ui:84
+#: src/resources/window.ui:85
 msgid "tab-music"
 msgstr "Music"
 
 #: src/resources/window.ui:86 src/resources/window.ui:97
+#: src/resources/window.ui:98
 msgid "tab-books"
 msgstr "Books"
 
-#: src/resources/window.ui:71
+#: src/resources/window.ui:71 src/resources/window.ui:72
 msgid "tab-info"
 msgstr "About the piece"
 
-#: src/resources/info_panel.ui:13
+#: src/resources/info_panel.ui:13 src/resources/info_panel.ui:13
 msgid "info-no-file"
 msgstr "No piece"
 
-#: src/resources/info_panel.ui:14
+#: src/resources/info_panel.ui:14 src/resources/info_panel.ui:14
 msgid "info-play-something"
 msgstr "Play something to see details"
+
+#: src/ui/media_library_item.rs:69
+msgid "placeholder-album"
+msgstr "no album"
+
+#: src/ui/media_library_item.rs:91
+msgid "placeholder-artist"
+msgstr "unknown artist"
+
+#: src/ui/media_library_item.rs:107
+msgid "placeholder-genre"
+msgstr "unknown genre"
+
+#: src/ui/media_library_item.rs:122
+msgid "placeholder-year"
+msgstr "unknown year"

@@ -283,10 +283,12 @@ pub async fn mpris(
                         Value::new(album.title.to_string()).try_into_owned()?,
                     );
 
-                    metadata.insert(
-                        "mpris:artUrl".to_string(),
-                        Value::new("file://".to_owned() + &album.cover).try_into_owned()?,
-                    );
+                    if let Some(cover) = album.cover {
+                        metadata.insert(
+                            "mpris:artUrl".to_string(),
+                            Value::new("file://".to_owned() + &cover).try_into_owned()?,
+                        );
+                    }
 
                     let mut os = object_server.get_mut().await;
                     os.metadata = metadata;

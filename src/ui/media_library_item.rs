@@ -3,6 +3,7 @@ use crate::data::artist::ArtistId;
 use crate::data::object_id::ObjectId;
 use crate::data::track::TrackId;
 use crate::db::database::Subdatabase;
+use gettextrs::gettext;
 use gio::subclass::prelude::ObjectSubclassIsExt;
 use gtk4::glib;
 use gtk4::glib::Object;
@@ -65,13 +66,13 @@ impl MediaLibraryItem {
         let name = if !s.is_empty() {
             s
         } else {
-            String::from("[no album]")
+            gettext("placeholder-album")
         };
 
         let obj: Self = Object::builder()
             .property("stored_object", ObjectId::from(album_id))
             .property("name", name)
-            .property("image", &database[album_id].cover.to_string())
+            .property("image", &database[album_id].cover.map(|s| s.to_string()))
             .build();
 
         obj.imp().filters.replace(filters);
@@ -87,7 +88,7 @@ impl MediaLibraryItem {
                 database[artist_id]
                     .name
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| "[unknown artist]".to_string()),
+                    .unwrap_or_else(|| gettext("placeholder-artist")),
             )
             .build();
 
@@ -103,7 +104,7 @@ impl MediaLibraryItem {
                 "name",
                 genre
                     .map(|genre| genre.to_string())
-                    .unwrap_or("[no genre]".to_string()),
+                    .unwrap_or(gettext("placeholder-genre")),
             )
             .build();
 
@@ -118,7 +119,7 @@ impl MediaLibraryItem {
             .property(
                 "name",
                 year.map(|x| x.to_string())
-                    .unwrap_or("[unknown year]".to_string()),
+                    .unwrap_or(gettext("placeholder-year")),
             )
             .build();
 

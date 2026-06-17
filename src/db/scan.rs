@@ -26,7 +26,7 @@ pub struct Scanner {
     music_brainz: MusicBrainz,
     files: HashMap<PathBuf, FileData>,
     #[serde(with = "scanner_serde")]
-    covers: HashMap<AlbumIdentification, Ustr>,
+    covers: HashMap<AlbumIdentification, Option<Ustr>>,
 }
 
 impl Scanner {
@@ -102,10 +102,10 @@ impl Scanner {
     }
 }
 
-fn make_cover(album: &AlbumIdentification, some_file: &Path, config: &Config) -> Ustr {
+fn make_cover(album: &AlbumIdentification, some_file: &Path, config: &Config) -> Option<Ustr> {
     let cover_name = match album {
         AlbumIdentification::None => {
-            return config.album_placeholder_path().to_string_lossy().into();
+            return None;
         }
         AlbumIdentification::MusicBrainz { uuid, .. } => uuid.to_string(),
         AlbumIdentification::Custom { title, sort } => {
@@ -139,9 +139,9 @@ fn make_cover(album: &AlbumIdentification, some_file: &Path, config: &Config) ->
     })();
 
     if result.is_err() {
-        config.album_placeholder_path().to_string_lossy().into()
+        None
     } else {
-        cover_path.to_string_lossy().into()
+        Some(cover_path.to_string_lossy().into())
     }
 }
 
@@ -270,7 +270,7 @@ mod scanner_serde {
     use serde::{Deserializer, Serializer};
     use ustr::Ustr;
 
-    type Attr = std::collections::HashMap<AlbumIdentification, Ustr>;
+    type Attr = std::collections::HashMap<AlbumIdentification, Option<Ustr>>;
 
     pub(super) fn serialize<S: Serializer>(attr: &Attr, ser: S) -> Result<S::Ok, S::Error> {
         let attr: Vec<_> = attr.iter().collect();

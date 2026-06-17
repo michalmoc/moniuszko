@@ -1,7 +1,7 @@
 use crate::data::playback_status::PlaybackStatus;
 use gtk4::glib;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
-use log::{info, warn};
+use log::warn;
 use std::time::Duration;
 
 mod imp {
@@ -18,8 +18,8 @@ mod imp {
         DerivedObjectProperties, ObjectImplExt, ObjectSubclassExt, ObjectSubclassIsExt,
     };
     use gtk4::subclass::prelude::{ObjectImpl, ObjectSubclass};
-    use log::{info, warn};
-    use rodio::source::{EmptyCallback, SineWave};
+    use log::warn;
+    use rodio::source::EmptyCallback;
     use rodio::{Decoder, MixerDeviceSink, Player, Source};
     use std::cell::{Cell, RefCell};
     use std::fs::File;
