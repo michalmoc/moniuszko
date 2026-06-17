@@ -45,7 +45,6 @@ other:
 
 - add screenshots here
 - save library grouping mode and repeat mode
-- search should ignore letter case
 - publish as rust crate
 - publish on AUR
 - complete mpris

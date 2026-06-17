@@ -240,17 +240,17 @@ impl Subdatabase {
     }
 
     fn keyword_in_track(&self, keyword: &str, track: &Track) -> bool {
-        if track.title.contains(keyword) {
+        if track.title.to_lowercase().contains(keyword) {
             return true;
         }
 
         if let Some(artists) = track.artists
-            && artists.contains(keyword)
+            && artists.to_lowercase().contains(keyword)
         {
             return true;
         }
 
-        if self[track.album].title.contains(keyword) {
+        if self[track.album].title.to_lowercase().contains(keyword) {
             return true;
         }
 
@@ -258,7 +258,10 @@ impl Subdatabase {
     }
 
     pub fn search(&self, text: &str) -> SearchResult {
-        let keywords = text.split_whitespace().collect_vec();
+        let keywords = text
+            .split_whitespace()
+            .map(|s| s.to_lowercase())
+            .collect_vec();
 
         if keywords.is_empty() {
             return SearchResult::default();
