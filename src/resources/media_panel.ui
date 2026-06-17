@@ -7,22 +7,12 @@
             </object>
         </child>
         <child>
-            <object class="GtkScrolledWindow">
-                <property name="hscrollbar-policy">Automatic</property>
-                <property name="min-content-width">256</property>
-                <property name="hexpand">false</property>
+            <object class="MediaLibraryUi" id="media_library">
+                <signal name="activate" handler="handle_library_activate" swapped="true"/>
+
                 <property name="vexpand">true</property>
-                <property name="propagate-natural-width">true</property>
-
-                <property name="child">
-                    <object class="MediaLibraryUi" id="media_library">
-                        <signal name="activate" handler="handle_library_activate" swapped="true"/>
-
-                        <property name="vexpand">true</property>
-                        <property name="subdatabase" bind-source="MediaPanel" bind-property="subdatabase"
-                                  bind-flags="sync-create"/>
-                    </object>
-                </property>
+                <property name="subdatabase" bind-source="MediaPanel" bind-property="subdatabase"
+                          bind-flags="sync-create"/>
             </object>
         </child>
         <child>

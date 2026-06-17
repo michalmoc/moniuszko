@@ -3,7 +3,7 @@ use crate::db::database::DatabasePtr;
 use crate::ui::media_library_item::MediaLibraryItem;
 use gtk4::prelude::{Cast, CastNone};
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
-use gtk4::{MultiSelection, TreeListModel, Widget, glib};
+use gtk4::{ListView, MultiSelection, TreeListModel, Widget, glib};
 use std::cell::Ref;
 
 glib::wrapper! {
@@ -21,8 +21,13 @@ impl MediaLibraryUi {
     }
 
     pub fn repopulate(&self) {
-        let view_ptr = self.imp().view.borrow();
-        let view = view_ptr.as_ref().unwrap();
+        let sw_ptr = self.imp().scrolled_window.borrow();
+        let view = sw_ptr
+            .as_ref()
+            .unwrap()
+            .child()
+            .and_downcast::<ListView>()
+            .unwrap();
         let store = view
             .model()
             .and_downcast::<MultiSelection>()
@@ -107,8 +112,9 @@ mod imp {
     use gtk4::subclass::prelude::{DerivedObjectProperties, ObjectSubclassIsExt};
     use gtk4::subclass::prelude::{WidgetClassExt, WidgetImpl};
     use gtk4::{
-        DragSource, Image, Label, ListView, MultiSelection, Orientation, PickFlags,
-        SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget, gdk,
+        DragSource, Image, Label, ListView, MultiSelection, Orientation, PickFlags, PolicyType,
+        ScrolledWindow, SignalListItemFactory, TreeExpander, TreeListModel, TreeListRow, Widget,
+        gdk,
     };
     use std::cell::{Cell, RefCell};
     use std::sync::OnceLock;
@@ -125,7 +131,7 @@ mod imp {
         #[property(get, set, default)]
         pub grouping_mode: RefCell<GroupingMode>,
 
-        pub view: RefCell<Option<ListView>>,
+        pub scrolled_window: RefCell<Option<ScrolledWindow>>,
 
         pub database: RefCell<Option<DatabasePtr>>,
         pub search_result: RefCell<SearchResult>,
@@ -154,7 +160,6 @@ mod imp {
             obj.connect_grouping_mode_notify(|this| this.imp().on_grouping_changed());
 
             let view = new_view(obj.clone());
-            view.set_parent(&*obj);
             view.connect_activate(clone!(
                 #[strong]
                 obj,
@@ -167,11 +172,20 @@ mod imp {
                     obj.emit_by_name::<()>("activate", &[&item.stored_object()]);
                 }
             ));
-            self.view.replace(Some(view));
+
+            let sw = ScrolledWindow::builder()
+                .hscrollbar_policy(PolicyType::Automatic)
+                .min_content_width(256)
+                .hexpand(true)
+                .vexpand(true)
+                .child(&view)
+                .build();
+            sw.set_parent(&*obj);
+            self.scrolled_window.replace(Some(sw));
         }
 
         fn dispose(&self) {
-            if let Some(child) = self.view.borrow_mut().take() {
+            if let Some(child) = self.scrolled_window.borrow_mut().take() {
                 child.unparent();
             }
         }
