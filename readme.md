@@ -6,7 +6,12 @@ Yet another music player. See [Vision](#vision).
 
 Mostly ready, see [Roadmap](#roadmap).
 
-Warning: first scan may be slow, because of fetching data from musicbrainz.
+Warning: first scan may be slow, and requires internet access.
+
+## Screenshots
+
+![Light mode](./assets/screenshots/main2.png)
+![Dark mode](./assets/screenshots/main.png)
 
 ## Building
 
@@ -43,9 +48,7 @@ for 1.3:
 
 other:
 
-- add screenshots here
-- save library grouping mode and repeat mode
-- publish as rust crate
+- save library grouping mode, repeat mode and panel tab
 - publish on AUR
 - complete mpris
 - add more data to info panel
