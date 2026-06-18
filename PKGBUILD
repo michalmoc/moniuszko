@@ -6,6 +6,7 @@ pkgrel=1
 arch=("x86_64")
 license=("GPL-3.0-or-later")
 
+depends=(gtk4 libadwaita alsa-lib)
 makedepends=(cargo)
 source=("https://github.com/michalmoc/${pkgname}/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('38bf767600bf94d4120a17b3559f97f20777dfe26d97a2a31ad40d7e8dfc41e2')
