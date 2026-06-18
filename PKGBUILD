@@ -1,3 +1,5 @@
+# Maintainer: Michał Moczulski <michalmoczulski at fastmail dot com>
+
 pkgname="moniuszko"
 pkgdesc="Music player for GNOME (or any GTK env), inspired by Amarok 1 and Strawberry"
 url="https://github.com/michalmoc/moniuszko/"
