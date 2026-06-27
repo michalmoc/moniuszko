@@ -1,4 +1,5 @@
 use crate::data::playlist_entry_uuid::PlaylistEntryUuid;
+use crate::data::playlist_uuid::PlaylistUuid;
 use crate::data::track::TrackId;
 use crate::db::database::Database;
 use gtk4::glib;
@@ -7,6 +8,7 @@ use uuid::Uuid;
 
 mod imp {
     use crate::data::playlist_entry_uuid::PlaylistEntryUuid;
+    use crate::data::playlist_uuid::PlaylistUuid;
     use crate::data::track::TrackId;
     use gtk4::glib;
     use gtk4::glib::{Object, Properties};
@@ -19,8 +21,11 @@ mod imp {
     #[derive(Default, Properties)]
     #[properties(wrapper_type = super::PlaylistItem)]
     pub struct PlaylistItem {
-        #[property(get, set)]
+        #[property(get, construct_only)]
         uuid: Cell<PlaylistEntryUuid>,
+
+        #[property(get, construct_only)]
+        playlist: Cell<PlaylistUuid>,
 
         #[property(get, set)]
         stored_track: Cell<TrackId>,
@@ -63,9 +68,10 @@ glib::wrapper! {
 }
 
 impl PlaylistItem {
-    pub fn new(track_id: TrackId, database: &Database) -> Self {
+    pub fn new(playlist: PlaylistUuid, track_id: TrackId, database: &Database) -> Self {
         let obj: Self = Object::builder()
             .property("uuid", PlaylistEntryUuid::new(Uuid::new_v4()))
+            .property("playlist", playlist)
             .property("stored_track", track_id)
             .property("is_playing", false)
             .build();

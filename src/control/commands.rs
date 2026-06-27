@@ -1,11 +1,10 @@
-use crate::config::{Config, ConfigPtr, RandomMode};
-use crate::control::commands_history::CommandsHistory;
+use crate::config::{Config, ConfigPtr};
 use crate::control::modify_playlist_action::ModifyPlaylistAction;
 use crate::control::playback_state::PlaybackState;
 use crate::control::playlist_store::PlaylistStore;
-use crate::control::random_data::RandomData;
 use crate::data::object_id::{ObjectId, ObjectIds};
 use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
+use crate::data::playlist_uuid::PlaylistUuid;
 use crate::data::track::TrackId;
 use crate::db::database::{Database, DatabasePtr};
 use crate::db::scan::{Scanner, ScannerPtr};
@@ -15,6 +14,7 @@ use adw::glib;
 use adw::glib::clone;
 use async_channel::Receiver;
 use gtk4::prelude::{GtkWindowExt, WidgetExt};
+use log::warn;
 use std::fs;
 use std::fs::File;
 use std::ops::Deref;
@@ -88,14 +88,13 @@ pub enum Command {
     PlayPause,
     Stop,
     Play,
-    PlayFromPlaylist(u32),
+    PlayFromPlaylist(PlaylistUuid, u32),
     Previous,
     Seek(i64),
 
-    RefreshPlaylist,
-    ModifyPlaylist(ModifyPlaylistCommand),
-    Undo,
-    Redo,
+    ModifyPlaylist(PlaylistUuid, ModifyPlaylistCommand),
+    Undo(PlaylistUuid),
+    Redo(PlaylistUuid),
 
     RefreshMediaLibrary,
     ClearMediaLibrary,
@@ -110,12 +109,7 @@ pub async fn process_commands(
     config: ConfigPtr,
     scanner: ScannerPtr,
 ) {
-    let playlist = window.playlist();
     let playback_state = window.playback();
-
-    let mut history = CommandsHistory::new();
-    let mut random_data = RandomData::sattolo(playlist.len());
-    reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
 
     while let Ok(command) = queue.recv().await {
         match command {
@@ -130,10 +124,10 @@ pub async fn process_commands(
                 window.set_visible(!window.is_visible());
             }
             Command::Next => {
-                on_next(&playlist, &playback_state, &mut random_data);
+                on_next(&window, &playback_state);
             }
             Command::PlayPause => {
-                on_play_pause(&playlist, &playback_state);
+                on_play_pause(&window, &playback_state);
             }
             Command::Pause => {
                 on_pause(&playback_state);
@@ -145,31 +139,38 @@ pub async fn process_commands(
                 on_play(&playback_state);
             }
             Command::Previous => {
-                on_previous(&playlist, &playback_state, &mut random_data);
+                on_previous(&window, &playback_state);
             }
             Command::Seek(pos) => {
                 on_seek(&playback_state, pos);
             }
-            Command::PlayFromPlaylist(pos) => {
-                on_play_from_playlist(&playlist, &playback_state, pos);
-            }
-            Command::RefreshPlaylist => refresh_playlist(&playlist, &database.read().unwrap()),
-            Command::ModifyPlaylist(subcommand) => {
-                let action = subcommand.interpret(&playlist, &database.read().unwrap());
-                action.apply(&playlist, &database.read().unwrap());
-                history.push(action);
-                reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
-            }
-            Command::Undo => {
-                if let Some(cmd) = history.undo() {
-                    cmd.unapply(&playlist, &database.read().unwrap());
-                    reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
+            Command::PlayFromPlaylist(uuid, pos) => {
+                if let Some(playlist) = window.playlist(uuid) {
+                    on_play_from_playlist(&playlist, &playback_state, pos);
                 }
             }
-            Command::Redo => {
-                if let Some(cmd) = history.redo() {
-                    cmd.apply(&playlist, &database.read().unwrap());
-                    reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
+            Command::ModifyPlaylist(uuid, subcommand) => {
+                if let Some(mut playlist) = window.playlist_mut(uuid) {
+                    let action = subcommand.interpret(&playlist, &database.read().unwrap());
+                    action.apply(&playlist, &database.read().unwrap());
+                    playlist.history_mut().push(action);
+                    playlist.reset_random_data(&config.read().unwrap());
+                }
+            }
+            Command::Undo(uuid) => {
+                if let Some(mut playlist) = window.playlist_mut(uuid) {
+                    if let Some(cmd) = playlist.history_mut().undo() {
+                        cmd.unapply(&playlist, &database.read().unwrap());
+                        playlist.reset_random_data(&config.read().unwrap());
+                    }
+                }
+            }
+            Command::Redo(uuid) => {
+                if let Some(mut playlist) = window.playlist_mut(uuid) {
+                    if let Some(cmd) = playlist.history_mut().redo() {
+                        cmd.apply(&playlist, &database.read().unwrap());
+                        playlist.reset_random_data(&config.read().unwrap());
+                    }
                 }
             }
             Command::RefreshMediaLibrary => refresh_library(
@@ -181,26 +182,26 @@ pub async fn process_commands(
             Command::ClearMediaLibrary => {
                 clear_media_library(
                     &window,
-                    database.clone(),
-                    &playlist,
-                    scanner.clone(),
-                    &mut history,
+                    &mut database.write().unwrap(),
+                    &mut scanner.write().unwrap(),
+                    &config.read().unwrap(),
                 );
 
-                reset_random_data(&mut random_data, &config.read().unwrap(), &playlist);
+                let cfg = config.read().unwrap();
+                for (_, playlist) in window.playlists_mut().iter_mut() {
+                    playlist.reset_random_data(&cfg);
+                }
             }
             Command::ResetRandomData => {
-                reset_random_data(&mut random_data, &config.read().unwrap(), &playlist)
+                let cfg = config.read().unwrap();
+                for (_, playlist) in window.playlists_mut().iter_mut() {
+                    playlist.reset_random_data(&cfg);
+                }
             }
         }
     }
-}
 
-fn reset_random_data(data: &mut RandomData, config: &Config, playlist: &PlaylistStore) {
-    *data = match config.random_mode {
-        RandomMode::TrueRandom => RandomData::pcg(playlist.len()),
-        RandomMode::Permutation => RandomData::sattolo(playlist.len()),
-    }
+    warn!("command queue exited");
 }
 
 pub fn on_play_from_playlist(playlist: &PlaylistStore, playback_state: &PlaybackState, pos: u32) {
@@ -236,9 +237,12 @@ fn on_seek(playback_state: &PlaybackState, offset: i64) {
     }
 }
 
-fn on_play_pause(playlist: &PlaylistStore, playback_state: &PlaybackState) {
+fn on_play_pause(window: &Window, playback_state: &PlaybackState) {
     if playback_state.current().is_none() {
-        if playlist.len() > 0 {
+        if let Some(current_playlist) = window.current_playlist()
+            && let Some(playlist) = window.playlist(current_playlist)
+            && playlist.len() > 0
+        {
             let item = playlist.get(0).unwrap();
             playback_state.set_current(Some(item));
             playback_state.set_playing(true);
@@ -248,41 +252,42 @@ fn on_play_pause(playlist: &PlaylistStore, playback_state: &PlaybackState) {
     }
 }
 
-fn on_next(playlist: &PlaylistStore, playback_state: &PlaybackState, rng: &mut RandomData) {
-    if let Some(current) = playback_state.current() {
-        if let Some(idx) = playlist.find(&current) {
-            // playlist.n_items() != 0 because current present
-            let next = playback_state.repeat_mode().next(idx, playlist.len(), rng);
-            playback_state.set_current(playlist.get(next));
-            playback_state.set_playing(true);
-        } else {
-            playback_state.set_current(None::<PlaylistItem>);
-            on_play_pause(playlist, playback_state);
-        }
+fn on_next(window: &Window, playback_state: &PlaybackState) {
+    if let Some(current) = playback_state.current()
+        && let Some(mut playlist) = window.playlist_mut(current.playlist())
+        && let Some(idx) = playlist.find(&current)
+    {
+        let next =
+            playback_state
+                .repeat_mode()
+                .next(idx, playlist.len(), playlist.random_data_mut());
+        playback_state.set_current(playlist.get(next));
+        playback_state.set_playing(true);
     } else {
-        on_play_pause(playlist, playback_state);
+        playback_state.set_current(None::<PlaylistItem>);
+        on_play_pause(window, playback_state);
     }
 }
 
-fn on_previous(playlist: &PlaylistStore, playback_state: &PlaybackState, rng: &mut RandomData) {
-    if let Some(current) = playback_state.current() {
-        if let Some(idx) = playlist.find(&current) {
-            if playback_state.progress() * 10 > playback_state.duration() {
-                playback_state.seek(0);
-            } else {
-                // playlist.n_items() != 0 because current present
-                let next = playback_state
-                    .repeat_mode()
-                    .previous(idx, playlist.len(), rng);
-                playback_state.set_current(playlist.get(next));
-                playback_state.set_playing(true);
-            }
+fn on_previous(window: &Window, playback_state: &PlaybackState) {
+    if let Some(current) = playback_state.current()
+        && let Some(mut playlist) = window.playlist_mut(current.playlist())
+        && let Some(idx) = playlist.find(&current)
+    {
+        if playback_state.progress() * 10 > playback_state.duration() {
+            playback_state.seek(0);
         } else {
-            playback_state.set_current(None::<PlaylistItem>);
-            on_play_pause(playlist, playback_state);
+            let next = playback_state.repeat_mode().previous(
+                idx,
+                playlist.len(),
+                playlist.random_data_mut(),
+            );
+            playback_state.set_current(playlist.get(next));
+            playback_state.set_playing(true);
         }
     } else {
-        on_play_pause(playlist, playback_state);
+        playback_state.set_current(None::<PlaylistItem>);
+        on_play_pause(window, playback_state);
     }
 }
 
@@ -358,7 +363,13 @@ pub fn refresh_library(
         .expect("Task needs to finish successfully.");
 
         window.repopulate_media_library();
-        refresh_playlist(&window.playlist(), &database.read().unwrap());
+
+        {
+            let db = database.read().unwrap();
+            for (_, playlist) in window.playlists().iter() {
+                refresh_playlist(playlist, &db);
+            }
+        }
 
         window.lock_refresh(false);
     });
@@ -366,14 +377,15 @@ pub fn refresh_library(
 
 pub fn clear_media_library(
     window: &Window,
-    database: DatabasePtr,
-    playlist_store: &PlaylistStore,
-    scanner: ScannerPtr,
-    history: &mut CommandsHistory,
+    database: &mut Database,
+    scanner: &mut Scanner,
+    config: &Config,
 ) {
-    *database.write().unwrap() = Database::default();
-    *scanner.write().unwrap() = Scanner::default();
+    for (_, playlist) in window.playlists_mut().iter_mut() {
+        playlist.reset(&config);
+    }
+
+    *database = Database::default();
+    *scanner = Scanner::default();
     window.repopulate_media_library();
-    playlist_store.remove_all();
-    history.clear();
 }

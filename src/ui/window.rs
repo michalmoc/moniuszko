@@ -2,12 +2,15 @@ use crate::config::{Config, ConfigPtr};
 use crate::control::commands::Command;
 use crate::control::playback_state::PlaybackState;
 use crate::control::playlist_store::PlaylistStore;
+use crate::data::playlist_uuid::PlaylistUuid;
 use crate::db::database::DatabasePtr;
 use adw::subclass::prelude::ObjectSubclassIsExt;
 use async_channel::Sender;
 use glib::Object;
 use gtk4::prelude::WidgetExt;
 use gtk4::{gio, glib};
+use std::cell::{Ref, RefMut};
+use std::collections::HashMap;
 
 glib::wrapper! {
     pub struct Window(ObjectSubclass<imp::Window>)
@@ -31,14 +34,30 @@ impl Window {
         self.imp().bind_data(database, config, commands);
     }
 
-    pub fn playlist(&self) -> PlaylistStore {
-        self.imp()
-            .bound_data
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .playlist
-            .clone()
+    pub fn playlist(&self, uuid: PlaylistUuid) -> Option<Ref<'_, PlaylistStore>> {
+        Ref::filter_map(self.imp().bound_data.borrow(), |d| {
+            d.as_ref().and_then(|d| d.playlists.get(&uuid))
+        })
+        .ok()
+    }
+
+    pub fn playlist_mut(&self, uuid: PlaylistUuid) -> Option<RefMut<'_, PlaylistStore>> {
+        RefMut::filter_map(self.imp().bound_data.borrow_mut(), |d| {
+            d.as_mut().and_then(|d| d.playlists.get_mut(&uuid))
+        })
+        .ok()
+    }
+
+    pub fn playlists(&self) -> Ref<'_, HashMap<PlaylistUuid, PlaylistStore>> {
+        Ref::map(self.imp().bound_data.borrow(), |d| {
+            &d.as_ref().unwrap().playlists
+        })
+    }
+
+    pub fn playlists_mut(&self) -> RefMut<'_, HashMap<PlaylistUuid, PlaylistStore>> {
+        RefMut::map(self.imp().bound_data.borrow_mut(), |d| {
+            &mut d.as_mut().unwrap().playlists
+        })
     }
 
     pub fn playback(&self) -> PlaybackState {
@@ -60,6 +79,10 @@ impl Window {
         self.imp().media_panel_music.repopulate();
         self.imp().media_panel_books.repopulate()
     }
+
+    pub fn current_playlist(&self) -> Option<PlaylistUuid> {
+        self.imp().current_playlist()
+    }
 }
 
 mod imp {
@@ -69,19 +92,22 @@ mod imp {
     use crate::control::playlist_store::PlaylistStore;
     use crate::data::object_id::{ObjectId, ObjectIds};
     use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
+    use crate::data::playlist_uuid::PlaylistUuid;
     use crate::db::database::DatabasePtr;
     use crate::ui::info_panel::InfoPanel;
     use crate::ui::media_panel::MediaPanel;
     use crate::ui::player::PlayerUi;
     use crate::ui::playlist::PlaylistUi;
+    use crate::ui::playlist_item::PlaylistItem;
     use crate::ui::preferences::Preferences;
+    use adw::TabView;
     use adw::prelude::AdwDialogExt;
     use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
     use async_channel::Sender;
     use gtk4::gdk::{Key, ModifierType};
-    use gtk4::glib::Propagation;
     use gtk4::glib::subclass::InitializingObject;
-    use gtk4::prelude::{Cast, GtkWindowExt, ObjectExt, WidgetExt};
+    use gtk4::glib::{Propagation, clone};
+    use gtk4::prelude::{Cast, GtkWindowExt, ObjectExt, StaticType, WidgetExt};
     use gtk4::subclass::prelude::ObjectSubclassExt;
     use gtk4::subclass::prelude::WidgetClassExt;
     use gtk4::subclass::prelude::{
@@ -94,6 +120,7 @@ mod imp {
     use gtk4::{CompositeTemplate, TemplateChild, glib, template_callbacks};
     use log::error;
     use std::cell::RefCell;
+    use std::collections::HashMap;
 
     #[derive(CompositeTemplate, Default)]
     #[template(resource = "/org/moniuszko/window.ui")]
@@ -108,7 +135,7 @@ mod imp {
         pub media_panel_books: TemplateChild<MediaPanel>,
 
         #[template_child]
-        pub playlist: TemplateChild<PlaylistUi>,
+        pub playlist_tab_view: TemplateChild<TabView>,
 
         #[template_child]
         pub player: TemplateChild<PlayerUi>,
@@ -121,7 +148,7 @@ mod imp {
 
     pub struct BoundData {
         pub commands: Sender<Command>,
-        pub playlist: PlaylistStore,
+        pub playlists: HashMap<PlaylistUuid, PlaylistStore>,
         pub database: DatabasePtr,
         pub config: ConfigPtr,
     }
@@ -137,13 +164,20 @@ mod imp {
             klass.bind_template_callbacks();
 
             klass.install_action("current-playlist-delete-selected", None, |window, _, _| {
-                window.imp().playlist.request_delete_selected()
+                if let Some(page) = window.imp().playlist_tab_view.selected_page() {
+                    page.child()
+                        .downcast::<PlaylistUi>()
+                        .unwrap()
+                        .request_delete_selected()
+                }
             });
 
             klass.install_action("current-playlist-clear", None, |window, _, _| {
-                window
-                    .imp()
-                    .command(Command::ModifyPlaylist(ModifyPlaylistCommand::Clear))
+                if let Some(uuid) = window.current_playlist() {
+                    window
+                        .imp()
+                        .command(Command::ModifyPlaylist(uuid, ModifyPlaylistCommand::Clear))
+                }
             });
 
             klass.install_action("config", None, |window, _, _| {
@@ -163,11 +197,15 @@ mod imp {
             });
 
             klass.install_action("current-playlist-undo", None, |window, _, _| {
-                window.imp().command(Command::Undo)
+                if let Some(uuid) = window.current_playlist() {
+                    window.imp().command(Command::Undo(uuid))
+                }
             });
 
             klass.install_action("current-playlist-redo", None, |window, _, _| {
-                window.imp().command(Command::Redo)
+                if let Some(uuid) = window.current_playlist() {
+                    window.imp().command(Command::Redo(uuid))
+                }
             });
 
             klass.add_binding_action(Key::Q, ModifierType::CONTROL_MASK, "quit");
@@ -193,9 +231,33 @@ mod imp {
             config: ConfigPtr,
             commands: Sender<Command>,
         ) {
-            let playlist = self.playlist.playlist().unwrap();
+            let playlist = gio::ListStore::with_type(PlaylistItem::static_type()); // TODO: self.playlist.playlist().unwrap();
             let playlist =
                 PlaylistStore::wrap_and_load(playlist, &database.read().unwrap(), config.clone());
+
+            let playlist_ui = PlaylistUi::new(&playlist);
+            playlist_ui.connect_request_add_tracks(clone!(
+                #[weak(rename_to=this)]
+                self,
+                move |p, o, n| this.handle_request_add_tracks(p, o, n)
+            ));
+            playlist_ui.connect_request_move_tracks(clone!(
+                #[weak(rename_to=this)]
+                self,
+                move |p, o, n| this.handle_request_move_tracks(p, o, n)
+            ));
+            playlist_ui.connect_request_remove_tracks(clone!(
+                #[weak(rename_to=this)]
+                self,
+                move |p, o| this.handle_request_remove_tracks(p, o)
+            ));
+            playlist_ui.connect_activate(clone!(
+                #[weak(rename_to=this)]
+                self,
+                move |p, n| this.handle_playlist_activate(p, n)
+            ));
+
+            self.playlist_tab_view.append(&playlist_ui);
 
             self.media_panel_music.bind_data(database.clone());
             self.media_panel_music.repopulate();
@@ -206,7 +268,7 @@ mod imp {
 
             self.bound_data.replace(Some(BoundData {
                 commands,
-                playlist,
+                playlists: [(playlist.uuid(), playlist)].into(),
                 database,
                 config,
             }));
@@ -226,25 +288,40 @@ mod imp {
 
     #[template_callbacks]
     impl Window {
-        #[template_callback]
-        fn handle_request_add_tracks(&self, objs: ObjectIds, pos: u32) {
-            self.command(Command::ModifyPlaylist(ModifyPlaylistCommand::Add(
-                objs, pos,
-            )))
+        pub fn current_playlist(&self) -> Option<PlaylistUuid> {
+            self.playlist_tab_view
+                .selected_page()
+                .map(|p| p.child().downcast::<PlaylistUi>().unwrap().uuid())
         }
 
-        #[template_callback]
-        fn handle_request_move_tracks(&self, entries: PlaylistEntryUuids, pos: u32) {
-            self.command(Command::ModifyPlaylist(ModifyPlaylistCommand::Move(
-                entries, pos,
-            )))
+        fn handle_request_add_tracks(&self, playlist: PlaylistUi, objs: ObjectIds, pos: u32) {
+            self.command(Command::ModifyPlaylist(
+                playlist.uuid(),
+                ModifyPlaylistCommand::Add(objs, pos),
+            ))
         }
 
-        #[template_callback]
-        fn handle_request_remove_tracks(&self, uuids: PlaylistEntryUuids) {
-            self.command(Command::ModifyPlaylist(ModifyPlaylistCommand::Remove(
-                uuids,
-            )))
+        fn handle_request_move_tracks(
+            &self,
+            playlist: PlaylistUi,
+            entries: PlaylistEntryUuids,
+            pos: u32,
+        ) {
+            self.command(Command::ModifyPlaylist(
+                playlist.uuid(),
+                ModifyPlaylistCommand::Move(entries, pos),
+            ))
+        }
+
+        fn handle_request_remove_tracks(&self, playlist: PlaylistUi, uuids: PlaylistEntryUuids) {
+            self.command(Command::ModifyPlaylist(
+                playlist.uuid(),
+                ModifyPlaylistCommand::Remove(uuids),
+            ))
+        }
+
+        fn handle_playlist_activate(&self, playlist: PlaylistUi, pos: u32) {
+            self.command(Command::PlayFromPlaylist(playlist.uuid(), pos))
         }
 
         #[template_callback]
@@ -268,16 +345,13 @@ mod imp {
         }
 
         #[template_callback]
-        fn handle_playlist_activate(&self, pos: u32) {
-            self.command(Command::PlayFromPlaylist(pos))
-        }
-
-        #[template_callback]
         fn handle_library_activate(&self, obj: ObjectId) {
-            self.command(Command::ModifyPlaylist(ModifyPlaylistCommand::Add(
-                ObjectIds::single(obj),
-                u32::MAX,
-            )))
+            if let Some(uuid) = self.current_playlist() {
+                self.command(Command::ModifyPlaylist(
+                    uuid,
+                    ModifyPlaylistCommand::Add(ObjectIds::single(obj), u32::MAX),
+                ))
+            }
         }
 
         #[template_callback]

@@ -6,5 +6,6 @@ pub mod grouping_mode;
 pub mod object_id;
 pub mod playback_status;
 pub mod playlist_entry_uuid;
+pub mod playlist_uuid;
 pub mod repeat_mode;
 pub mod track;

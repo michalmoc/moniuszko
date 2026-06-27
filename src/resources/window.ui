@@ -105,35 +105,41 @@
                                 <property name="orientation">vertical</property>
 
                                 <child>
-                                    <object class="GtkScrolledWindow">
-                                        <property name="hscrollbar-policy">Automatic</property>
-                                        <property name="min_content_width">120</property>
-                                        <property name="hexpand">true</property>
-                                        <property name="vexpand">true</property>
-
-                                        <property name="child">
-                                            <object class="PlaylistUi" id="playlist">
-                                                <signal name="request_add_tracks"
-                                                        handler="handle_request_add_tracks"
-                                                        swapped="true"/>
-                                                <signal name="request_move_tracks"
-                                                        handler="handle_request_move_tracks"
-                                                        swapped="true"/>
-                                                <signal name="request_remove_tracks"
-                                                        handler="handle_request_remove_tracks"
-                                                        swapped="true"/>
-                                                <signal name="activate"
-                                                        handler="handle_playlist_activate"
-                                                        swapped="true"/>
-
-                                                <property name="playlist">
-                                                    <object class="GListStore">
-                                                        <property name="item-type">PlaylistItem</property>
-                                                    </object>
-                                                </property>
+                                    <object class="AdwToolbarView">
+                                        <child type="top">
+                                            <object class="AdwTabBar">
+                                                <property name="view">playlist_tab_view</property>
+                                                <property name="autohide">false</property>
+                                            </object>
+                                        </child>
+                                        <property name="content">
+                                            <object class="AdwTabView" id="playlist_tab_view">
+                                                <property name="vexpand">true</property>
                                             </object>
                                         </property>
                                     </object>
+                                    <!--                                    <object class="PlaylistUi" id="playlist">-->
+                                    <!--                                        <signal name="request_add_tracks"-->
+                                    <!--                                                handler="handle_request_add_tracks"-->
+                                    <!--                                                swapped="true"/>-->
+                                    <!--                                        <signal name="request_move_tracks"-->
+                                    <!--                                                handler="handle_request_move_tracks"-->
+                                    <!--                                                swapped="true"/>-->
+                                    <!--                                        <signal name="request_remove_tracks"-->
+                                    <!--                                                handler="handle_request_remove_tracks"-->
+                                    <!--                                                swapped="true"/>-->
+                                    <!--                                        <signal name="activate"-->
+                                    <!--                                                handler="handle_playlist_activate"-->
+                                    <!--                                                swapped="true"/>-->
+
+                                    <!--                                        <property name="vexpand">true</property>-->
+
+                                    <!--                                        <property name="playlist">-->
+                                    <!--                                            <object class="GListStore">-->
+                                    <!--                                                <property name="item-type">PlaylistItem</property>-->
+                                    <!--                                            </object>-->
+                                    <!--                                        </property>-->
+                                    <!--                                    </object>-->
                                 </child>
                                 <child>
                                     <object class="PlayerUi" id="player">

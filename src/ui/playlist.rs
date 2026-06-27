@@ -1,6 +1,11 @@
-use gtk4::Widget;
+use crate::control::playlist_store::PlaylistStore;
+use crate::data::object_id::ObjectIds;
+use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
 use gtk4::glib;
+use gtk4::glib::{Object, closure_local};
+use gtk4::prelude::{CastNone, ObjectExt};
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
+use gtk4::{ColumnView, Widget};
 
 glib::wrapper! {
     pub struct PlaylistUi(ObjectSubclass<imp::PlaylistUi>)
@@ -9,14 +14,67 @@ glib::wrapper! {
 }
 
 impl PlaylistUi {
+    pub fn new(playlist: &PlaylistStore) -> Self {
+        Object::builder()
+            .property("uuid", playlist.uuid())
+            .property("playlist", playlist.inner())
+            .build()
+    }
+
     pub fn request_delete_selected(&self) {
-        imp::on_delete_selected(self.imp().view.borrow().as_ref().unwrap(), self);
+        let root = self.imp().root.borrow();
+        let view = root
+            .as_ref()
+            .unwrap()
+            .child()
+            .and_downcast::<ColumnView>()
+            .unwrap();
+        imp::on_delete_selected(&view, self);
+    }
+
+    pub fn connect_activate(&self, f: impl Fn(PlaylistUi, u32) + 'static) {
+        self.connect_closure(
+            "activate",
+            false,
+            closure_local!(move |this, n| { f(this, n) }),
+        );
+    }
+
+    pub fn connect_request_remove_tracks(
+        &self,
+        f: impl Fn(PlaylistUi, PlaylistEntryUuids) + 'static,
+    ) {
+        self.connect_closure(
+            "request-remove-tracks",
+            false,
+            closure_local!(move |this, uuids| { f(this, uuids) }),
+        );
+    }
+
+    pub fn connect_request_add_tracks(&self, f: impl Fn(PlaylistUi, ObjectIds, u32) + 'static) {
+        self.connect_closure(
+            "request-add-tracks",
+            false,
+            closure_local!(move |this, oids, num| { f(this, oids, num) }),
+        );
+    }
+
+    pub fn connect_request_move_tracks(
+        &self,
+        f: impl Fn(PlaylistUi, PlaylistEntryUuids, u32) + 'static,
+    ) {
+        self.connect_closure(
+            "request-move-tracks",
+            false,
+            closure_local!(move |this, uuids, num| { f(this, uuids, num) }),
+        );
     }
 }
 
 mod imp {
     use crate::data::object_id::ObjectIds;
     use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
+    use crate::data::playlist_uuid::PlaylistUuid;
     use crate::ui::box_with_playlist_entry::BoxWithPlaylistEntry;
     use crate::ui::dnd_item::DndItem;
     use crate::ui::playlist_item::PlaylistItem;
@@ -34,20 +92,23 @@ mod imp {
     use gtk4::subclass::prelude::*;
     use gtk4::{
         Align, CallbackAction, ColumnView, ColumnViewColumn, DragSource, DropTarget, KeyvalTrigger,
-        Label, ListScrollFlags, MultiSelection, PickFlags, SelectionModel, Shortcut,
-        ShortcutController, SignalListItemFactory, Widget, gdk, glib,
+        Label, ListScrollFlags, MultiSelection, PickFlags, PolicyType, ScrolledWindow,
+        SelectionModel, Shortcut, ShortcutController, SignalListItemFactory, Widget, gdk, glib,
     };
     use log::error;
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     use std::sync::OnceLock;
 
     #[derive(Properties, Default)]
     #[properties(wrapper_type = super::PlaylistUi)]
     pub struct PlaylistUi {
         #[property(get, construct_only)]
+        uuid: Cell<PlaylistUuid>,
+
+        #[property(get, construct_only)]
         playlist: RefCell<Option<gio::ListStore>>,
 
-        pub view: RefCell<Option<ColumnView>>,
+        pub root: RefCell<Option<ScrolledWindow>>,
     }
 
     #[glib::object_subclass]
@@ -73,7 +134,6 @@ mod imp {
             let playlist = playlist_ref.as_ref().unwrap();
 
             let view = new_view(playlist, &obj);
-            view.set_parent(&*obj);
 
             view.connect_activate(clone!(
                 #[strong]
@@ -83,11 +143,20 @@ mod imp {
                 }
             ));
 
-            self.view.replace(Some(view));
+            let sw = ScrolledWindow::builder()
+                .hscrollbar_policy(PolicyType::Automatic)
+                .hexpand(true)
+                .vexpand(true)
+                .min_content_width(120)
+                .child(&view)
+                .build();
+
+            sw.set_parent(&*obj);
+            self.root.replace(Some(sw));
         }
 
         fn dispose(&self) {
-            if let Some(child) = self.view.borrow_mut().take() {
+            if let Some(child) = self.root.borrow_mut().take() {
                 child.unparent();
             }
         }

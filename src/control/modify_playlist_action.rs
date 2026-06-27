@@ -70,7 +70,7 @@ impl ModifyPlaylistAction {
     #[inline(always)]
     fn insert(playlist: &PlaylistStore, database: &Database, entries: &BTreeMap<u32, TrackId>) {
         for (i, track) in entries.iter() {
-            playlist.insert(*i, &PlaylistItem::new(*track, database));
+            playlist.insert(*i, &PlaylistItem::new(playlist.uuid(), *track, database));
         }
     }
 
