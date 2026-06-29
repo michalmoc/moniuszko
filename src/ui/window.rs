@@ -11,6 +11,7 @@ use gtk4::prelude::WidgetExt;
 use gtk4::{gio, glib};
 use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
+use std::ops::Deref;
 
 glib::wrapper! {
     pub struct Window(ObjectSubclass<imp::Window>)
@@ -34,30 +35,24 @@ impl Window {
         self.imp().bind_data(database, config, commands);
     }
 
+    pub fn current_playlist(&self) -> Option<PlaylistUuid> {
+        self.imp().playlist_panel.current()
+    }
+
     pub fn playlist(&self, uuid: PlaylistUuid) -> Option<Ref<'_, PlaylistStore>> {
-        Ref::filter_map(self.imp().bound_data.borrow(), |d| {
-            d.as_ref().and_then(|d| d.playlists.get(&uuid))
-        })
-        .ok()
+        self.imp().playlist_panel.deref().get(uuid)
     }
 
     pub fn playlist_mut(&self, uuid: PlaylistUuid) -> Option<RefMut<'_, PlaylistStore>> {
-        RefMut::filter_map(self.imp().bound_data.borrow_mut(), |d| {
-            d.as_mut().and_then(|d| d.playlists.get_mut(&uuid))
-        })
-        .ok()
+        self.imp().playlist_panel.deref().get_mut(uuid)
     }
 
     pub fn playlists(&self) -> Ref<'_, HashMap<PlaylistUuid, PlaylistStore>> {
-        Ref::map(self.imp().bound_data.borrow(), |d| {
-            &d.as_ref().unwrap().playlists
-        })
+        self.imp().playlist_panel.all()
     }
 
     pub fn playlists_mut(&self) -> RefMut<'_, HashMap<PlaylistUuid, PlaylistStore>> {
-        RefMut::map(self.imp().bound_data.borrow_mut(), |d| {
-            &mut d.as_mut().unwrap().playlists
-        })
+        self.imp().playlist_panel.all_mut()
     }
 
     pub fn playback(&self) -> PlaybackState {
@@ -79,39 +74,27 @@ impl Window {
         self.imp().media_panel_music.repopulate();
         self.imp().media_panel_books.repopulate()
     }
-
-    pub fn current_playlist(&self) -> Option<PlaylistUuid> {
-        self.imp().current_playlist()
-    }
 }
 
 mod imp {
     use crate::config::ConfigPtr;
     use crate::control::commands::{Command, ModifyPlaylistCommand};
     use crate::control::playback_state::PlaybackState;
-    use crate::control::playlist_store::PlaylistStore;
     use crate::data::object_id::{ObjectId, ObjectIds};
-    use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
-    use crate::data::playlist_uuid::PlaylistUuid;
-    use crate::data::track::TrackId;
     use crate::db::database::DatabasePtr;
     use crate::ui::info_panel::InfoPanel;
     use crate::ui::media_panel::MediaPanel;
     use crate::ui::player::PlayerUi;
-    use crate::ui::playlist::PlaylistUi;
+    use crate::ui::playlist_panel::PlaylistPanel;
     use crate::ui::preferences::Preferences;
-    use adw::glib::{ControlFlow, WeakRef, timeout_add_local};
-    use adw::prelude::{AdwDialogExt, AlertDialogExt};
+    use adw::glib::{ControlFlow, timeout_add_local};
+    use adw::prelude::AdwDialogExt;
     use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
-    use adw::{AlertDialog, TabPage, TabView};
     use async_channel::Sender;
-    use gettextrs::gettext;
     use gtk4::gdk::{Key, ModifierType};
     use gtk4::glib::subclass::InitializingObject;
     use gtk4::glib::{Propagation, clone};
-    use gtk4::prelude::{
-        Cast, CastNone, EditableExt, EntryExt, GtkWindowExt, ObjectExt, WidgetExt,
-    };
+    use gtk4::prelude::{Cast, GtkWindowExt, ObjectExt, WidgetExt};
     use gtk4::subclass::prelude::ObjectSubclassExt;
     use gtk4::subclass::prelude::WidgetClassExt;
     use gtk4::subclass::prelude::{
@@ -121,13 +104,9 @@ mod imp {
         CompositeTemplateCallbacksClass, CompositeTemplateInitializingExt, WidgetImpl,
     };
     use gtk4::subclass::window::WindowImpl;
-    use gtk4::{CompositeTemplate, Entry, TemplateChild, glib, template_callbacks};
-    use itertools::Itertools;
-    use log::{error, info, warn};
+    use gtk4::{CompositeTemplate, TemplateChild, glib, template_callbacks};
+    use log::{error, info};
     use std::cell::RefCell;
-    use std::collections::HashMap;
-    use std::fs;
-    use std::fs::File;
     use std::time::Duration;
 
     #[derive(CompositeTemplate, Default)]
@@ -143,7 +122,7 @@ mod imp {
         pub media_panel_books: TemplateChild<MediaPanel>,
 
         #[template_child]
-        pub playlist_tab_view: TemplateChild<TabView>,
+        pub playlist_panel: TemplateChild<PlaylistPanel>,
 
         #[template_child]
         pub player: TemplateChild<PlayerUi>,
@@ -156,10 +135,8 @@ mod imp {
 
     pub struct BoundData {
         pub commands: Sender<Command>,
-        pub playlists: HashMap<PlaylistUuid, PlaylistStore>,
         pub database: DatabasePtr,
         pub config: ConfigPtr,
-        pub selected_playlist: Option<WeakRef<TabPage>>,
     }
 
     #[glib::object_subclass]
@@ -173,16 +150,11 @@ mod imp {
             klass.bind_template_callbacks();
 
             klass.install_action("current-playlist-delete-selected", None, |window, _, _| {
-                if let Some(page) = window.imp().playlist_tab_view.selected_page() {
-                    page.child()
-                        .downcast::<PlaylistUi>()
-                        .unwrap()
-                        .request_delete_selected()
-                }
+                window.imp().playlist_panel.request_delete_selected()
             });
 
             klass.install_action("current-playlist-clear", None, |window, _, _| {
-                if let Some(uuid) = window.current_playlist() {
+                if let Some(uuid) = window.imp().playlist_panel.current() {
                     window
                         .imp()
                         .command(Command::ModifyPlaylist(uuid, ModifyPlaylistCommand::Clear))
@@ -206,38 +178,23 @@ mod imp {
             });
 
             klass.install_action("current-playlist-undo", None, |window, _, _| {
-                if let Some(uuid) = window.current_playlist() {
+                if let Some(uuid) = window.imp().playlist_panel.current() {
                     window.imp().command(Command::Undo(uuid))
                 }
             });
 
             klass.install_action("current-playlist-redo", None, |window, _, _| {
-                if let Some(uuid) = window.current_playlist() {
+                if let Some(uuid) = window.imp().playlist_panel.current() {
                     window.imp().command(Command::Redo(uuid))
                 }
             });
 
             klass.install_action("playlist-new", None, |window, _, _| {
-                window.imp().new_playlist();
-            });
-
-            klass.install_action("playlist-rename", None, |window, _, _| {
-                if let Some(data) = window.imp().bound_data.borrow().as_ref()
-                    && let Some(page) = &data.selected_playlist
-                    && let Some(page) = page.upgrade()
-                {
-                    window.imp().new_playlist_name(move |_, text| {
-                        page.set_title(text);
-                    });
-                }
-            });
-
-            klass.install_action("playlist-close", None, |window, _, _| {
-                if let Some(data) = window.imp().bound_data.borrow().as_ref()
-                    && let Some(page) = &data.selected_playlist
-                    && let Some(page) = page.upgrade()
-                {
-                    window.imp().playlist_tab_view.close_page(&page);
+                if let Some(data) = window.imp().bound_data.borrow().as_ref() {
+                    window
+                        .imp()
+                        .playlist_panel
+                        .new_playlist(data.config.clone());
                 }
             });
 
@@ -272,39 +229,14 @@ mod imp {
             self.info_panel.bind_data(database.clone());
 
             self.bound_data.replace(Some(BoundData {
-                commands,
-                playlists: Default::default(),
+                commands: commands.clone(),
                 database: database.clone(),
                 config: config.clone(),
-                selected_playlist: None,
             }));
 
-            if let Ok(playlists_file) = File::open(config.read().unwrap().playlists_path())
-                && let Ok(tracklists) =
-                    serde_json::from_reader::<_, Vec<(String, Vec<TrackId>)>>(playlists_file)
-            {
-                let db = database.read().unwrap();
-                let cfg = config.read().unwrap();
-                for (title, tracks) in tracklists {
-                    let playlist = PlaylistStore::from(&tracks, &db, &cfg);
-                    self.append_playlist(playlist, &title);
-                }
-            } else {
-                let playlist = PlaylistStore::new(&config.read().unwrap());
-                self.append_playlist(playlist, &gettext("playlist-default-name"));
-            }
-
-            self.playlist_tab_view.connect_setup_menu(clone!(
-                #[weak(rename_to=this)]
-                self,
-                move |_, page| {
-                    this.bound_data
-                        .borrow_mut()
-                        .as_mut()
-                        .unwrap()
-                        .selected_playlist = page.map(|p| p.downgrade());
-                }
-            ));
+            self.playlist_panel.bind_data(commands);
+            self.playlist_panel
+                .load(&config.read().unwrap(), &database.read().unwrap());
 
             timeout_add_local(
                 Duration::from_mins(5),
@@ -314,9 +246,7 @@ mod imp {
                     #[upgrade_or]
                     ControlFlow::Break,
                     move || {
-                        info!("saving data");
-                        this.save_config();
-                        this.save_playlists();
+                        this.save_data();
                         ControlFlow::Continue
                     }
                 ),
@@ -325,136 +255,21 @@ mod imp {
 
         #[inline(always)]
         fn command(&self, command: Command) {
-            self.bound_data
-                .borrow()
-                .as_ref()
-                .unwrap()
-                .commands
-                .send_blocking(command)
-                .unwrap()
+            if let Some(data) = self.bound_data.borrow().as_ref() {
+                data.commands.send_blocking(command).unwrap()
+            }
         }
     }
 
     impl Window {
-        pub fn new_playlist(&self) {
-            self.new_playlist_name(|this, text| {
-                let store = if let Some(bound_data) = this.bound_data.borrow().as_ref() {
-                    PlaylistStore::new(&bound_data.config.read().unwrap())
-                } else {
-                    return;
-                };
-                this.append_playlist(store, &text);
-            });
-        }
+        fn save_data(&self) {
+            info!("saving data");
 
-        pub fn new_playlist_name<F>(&self, f: F)
-        where
-            F: Fn(&Self, &str) + 'static,
-        {
-            let entry = Entry::new();
+            self.save_config();
 
-            let dialog = AlertDialog::new(Some(&gettext("new-playlist-name")), None);
-            dialog.set_extra_child(Some(&entry));
-            dialog.add_response("yes", &gettext("ok"));
-            dialog.add_response("no", &gettext("cancel"));
-            dialog.set_close_response("no");
-
-            entry.connect_activate(clone!(
-                #[weak]
-                dialog,
-                move |_| {
-                    dialog.set_close_response("yes");
-                    dialog.close();
-                }
-            ));
-
-            dialog.connect_response(
-                None,
-                clone!(
-                    #[weak(rename_to=this)]
-                    self,
-                    move |dialog, response| {
-                        if response == "yes" {
-                            let text = dialog.extra_child().and_downcast::<Entry>().unwrap().text();
-                            f(&this, &text);
-                        }
-                    }
-                ),
-            );
-
-            dialog.present(Some(&self.obj().clone()));
-            entry.grab_focus();
-        }
-
-        pub fn append_playlist(&self, playlist: PlaylistStore, name: &str) {
-            let playlist_ui = PlaylistUi::new(&playlist);
-            playlist_ui.connect_request_add_tracks(clone!(
-                #[weak(rename_to=this)]
-                self,
-                move |p, o, n| this.handle_request_add_tracks(p, o, n)
-            ));
-            playlist_ui.connect_request_move_tracks(clone!(
-                #[weak(rename_to=this)]
-                self,
-                move |p, o, n| this.handle_request_move_tracks(p, o, n)
-            ));
-            playlist_ui.connect_request_remove_tracks(clone!(
-                #[weak(rename_to=this)]
-                self,
-                move |p, o| this.handle_request_remove_tracks(p, o)
-            ));
-            playlist_ui.connect_activate(clone!(
-                #[weak(rename_to=this)]
-                self,
-                move |p, n| this.handle_playlist_activate(p, n)
-            ));
-
-            let page = self.playlist_tab_view.append(&playlist_ui);
-            page.set_title(name);
-            self.playlist_tab_view.set_selected_page(&page);
-
-            self.bound_data
-                .borrow_mut()
-                .as_mut()
-                .unwrap()
-                .playlists
-                .insert(playlist.uuid(), playlist);
-        }
-
-        pub fn current_playlist(&self) -> Option<PlaylistUuid> {
-            self.playlist_tab_view
-                .selected_page()
-                .map(|p| p.child().downcast::<PlaylistUi>().unwrap().uuid())
-        }
-
-        fn handle_request_add_tracks(&self, playlist: PlaylistUi, objs: ObjectIds, pos: u32) {
-            self.command(Command::ModifyPlaylist(
-                playlist.uuid(),
-                ModifyPlaylistCommand::Add(objs, pos),
-            ))
-        }
-
-        fn handle_request_move_tracks(
-            &self,
-            playlist: PlaylistUi,
-            entries: PlaylistEntryUuids,
-            pos: u32,
-        ) {
-            self.command(Command::ModifyPlaylist(
-                playlist.uuid(),
-                ModifyPlaylistCommand::Move(entries, pos),
-            ))
-        }
-
-        fn handle_request_remove_tracks(&self, playlist: PlaylistUi, uuids: PlaylistEntryUuids) {
-            self.command(Command::ModifyPlaylist(
-                playlist.uuid(),
-                ModifyPlaylistCommand::Remove(uuids),
-            ))
-        }
-
-        fn handle_playlist_activate(&self, playlist: PlaylistUi, pos: u32) {
-            self.command(Command::PlayFromPlaylist(playlist.uuid(), pos))
+            if let Some(data) = self.bound_data.borrow().as_ref() {
+                self.playlist_panel.save(&data.config.read().unwrap());
+            }
         }
 
         fn save_config(&self) {
@@ -468,36 +283,6 @@ mod imp {
 
                 if let Err(e) = cfg.save() {
                     error!("Error saving config: {}", e);
-                }
-            }
-        }
-
-        fn save_playlists(&self) {
-            if let Some(data) = self.bound_data.borrow().as_ref() {
-                let path = data.config.read().unwrap().playlists_path();
-
-                let to_save = (0..self.playlist_tab_view.n_pages())
-                    .map(|i| self.playlist_tab_view.nth_page(i))
-                    .map(|p| {
-                        (
-                            p.title().to_string(),
-                            p.child().downcast::<PlaylistUi>().unwrap().uuid(),
-                        )
-                    })
-                    .filter_map(|(title, uuid)| {
-                        data.playlists.get(&uuid).map(|playlist| (title, playlist))
-                    })
-                    .collect_vec();
-
-                let file =
-                    fs::create_dir_all(path.parent().unwrap()).and_then(|_| fs::File::create(path));
-                match file {
-                    Err(e) => {
-                        warn!("Error creating playlist file: {}", e);
-                    }
-                    Ok(file) => {
-                        serde_json::to_writer(file, &to_save).unwrap();
-                    }
                 }
             }
         }
@@ -527,7 +312,7 @@ mod imp {
 
         #[template_callback]
         fn handle_library_activate(&self, obj: ObjectId) {
-            if let Some(uuid) = self.current_playlist() {
+            if let Some(uuid) = self.playlist_panel.current() {
                 self.command(Command::ModifyPlaylist(
                     uuid,
                     ModifyPlaylistCommand::Add(ObjectIds::single(obj), u32::MAX),
@@ -542,48 +327,8 @@ mod imp {
 
         #[template_callback]
         fn handle_close_request(&self) -> Propagation {
-            info!("saving data");
-            self.save_playlists();
-            self.save_config();
-
+            self.save_data();
             Propagation::Proceed
-        }
-
-        #[template_callback]
-        fn handle_playlist_close(&self, page: &TabPage) -> Propagation {
-            let dialog = AlertDialog::new(Some(&gettext("sure-delete-playlist")), None);
-            dialog.add_response("yes", &gettext("ok"));
-            dialog.add_response("no", &gettext("cancel"));
-            dialog.set_close_response("no");
-
-            dialog.connect_response(
-                None,
-                clone!(
-                    #[weak(rename_to=this)]
-                    self,
-                    #[weak]
-                    page,
-                    move |_, response| {
-                        if response == "yes" {
-                            if let Some(data) = this.bound_data.borrow_mut().as_mut() {
-                                let uuid = page.child().downcast::<PlaylistUi>().unwrap().uuid();
-                                data.playlists.remove(&uuid);
-                            }
-                            this.playlist_tab_view.close_page_finish(&page, true)
-                        } else {
-                            this.playlist_tab_view.close_page_finish(&page, false)
-                        }
-                    }
-                ),
-            );
-
-            dialog.present(Some(&self.obj().clone()));
-            Propagation::Stop
-        }
-
-        #[template_callback]
-        fn handle_new_playlist(&self) {
-            self.new_playlist()
         }
     }
 

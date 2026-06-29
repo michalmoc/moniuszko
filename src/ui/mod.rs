@@ -7,5 +7,6 @@ mod media_panel;
 mod player;
 mod playlist;
 pub mod playlist_item;
+pub mod playlist_panel;
 mod preferences;
 pub mod window;

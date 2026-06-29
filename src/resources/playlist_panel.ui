@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="moniuszko">
+    <template class="PlaylistPanel">
+        <child>
+            <object class="AdwToolbarView">
+                <child type="top">
+                    <object class="AdwTabBar">
+                        <property name="view">tab_view</property>
+                        <property name="autohide">true</property>
+
+                        <property name="end-action-widget">
+                            <object class="GtkButton">
+                                <property name="icon-name">document-new</property>
+
+                                <signal name="clicked" handler="handle_new_playlist" swapped="true"/>
+                            </object>
+                        </property>
+                    </object>
+                </child>
+                <property name="content">
+                    <object class="AdwTabView" id="tab_view">
+                        <property name="vexpand">true</property>
+
+                        <signal name="close-page" handler="handle_playlist_close" swapped="true"/>
+
+                        <property name="menu_model">
+                            <menu>
+                                <item>
+                                    <attribute name="label" translatable="yes">playlist-rename</attribute>
+                                    <attribute name="action">playlist-rename</attribute>
+                                </item>
+                                <item>
+                                    <attribute name="label" translatable="yes">playlist-close</attribute>
+                                    <attribute name="action">playlist-close</attribute>
+                                </item>
+                            </menu>
+                        </property>
+                    </object>
+                </property>
+            </object>
+        </child>
+    </template>
+</interface>
