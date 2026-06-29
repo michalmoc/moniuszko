@@ -8,7 +8,7 @@ use crate::ui::playlist_item::PlaylistItem;
 use gio::prelude::{ListModelExt, ListModelExtManual};
 use gtk4::glib;
 use gtk4::glib::clone;
-use gtk4::prelude::{Cast, CastNone};
+use gtk4::prelude::{Cast, CastNone, StaticType};
 use log::warn;
 use std::fs;
 
@@ -20,8 +20,23 @@ pub struct PlaylistStore {
 }
 
 impl PlaylistStore {
-    pub fn wrap_and_load(store: gio::ListStore, database: &Database, config: ConfigPtr) -> Self {
+    // TODO: saving
+    pub fn new(config: &ConfigPtr) -> Self {
         let uuid = PlaylistUuid::new();
+
+        let store = gio::ListStore::with_type(PlaylistItem::static_type());
+
+        Self {
+            uuid,
+            history: Default::default(),
+            random_data: Self::make_random_data(&config.read().unwrap(), store.n_items()),
+            list: store,
+        }
+    }
+
+    pub fn load(database: &Database, config: &ConfigPtr) -> Self {
+        let uuid = PlaylistUuid::new();
+        let store = gio::ListStore::with_type(PlaylistItem::static_type());
 
         let path = config.read().unwrap().playlists_path();
 
@@ -33,13 +48,6 @@ impl PlaylistStore {
                 }
             }
         }
-
-        // TODO
-        store.connect_items_changed(clone!(
-            #[weak]
-            config,
-            move |list, _, _, _| save_playlist(list, &config)
-        ));
 
         Self {
             uuid,

@@ -43,11 +43,15 @@ Why?
 for 1.3:
 
 - many playlists
+    - save/load
+    - translations
+    - move to separate widget
 - save/load playlist
 - save last timestamp in audiobooks
 
 other:
 
+- bigger cover image for mpris
 - save library grouping mode, repeat mode and panel tab
 - publish on AUR
 - complete mpris

@@ -16,6 +16,11 @@
                                             <attribute name="label" translatable="yes">menu-playlist</attribute>
                                             <item>
                                                 <attribute name="label"
+                                                           translatable="yes">menu-new</attribute>
+                                                <attribute name="action">playlist-new</attribute>
+                                            </item>
+                                            <item>
+                                                <attribute name="label"
                                                            translatable="yes">menu-undo</attribute>
                                                 <attribute name="action">current-playlist-undo</attribute>
                                             </item>
@@ -109,37 +114,42 @@
                                         <child type="top">
                                             <object class="AdwTabBar">
                                                 <property name="view">playlist_tab_view</property>
-                                                <property name="autohide">false</property>
+                                                <property name="autohide">true</property>
+
+                                                <property name="end-action-widget">
+                                                    <object class="GtkButton">
+                                                        <property name="icon-name">document-new</property>
+
+                                                        <signal name="clicked" handler="handle_new_playlist"
+                                                                swapped="true"/>
+                                                    </object>
+                                                </property>
                                             </object>
                                         </child>
                                         <property name="content">
                                             <object class="AdwTabView" id="playlist_tab_view">
                                                 <property name="vexpand">true</property>
+
+                                                <signal name="close-page" handler="handle_playlist_close"
+                                                        swapped="true"/>
+
+                                                <property name="menu_model">
+                                                    <menu>
+                                                        <item>
+                                                            <attribute name="label"
+                                                                       translatable="yes">playlist-rename</attribute>
+                                                            <attribute name="action">playlist-rename</attribute>
+                                                        </item>
+                                                        <item>
+                                                            <attribute name="label"
+                                                                       translatable="yes">playlist-close</attribute>
+                                                            <attribute name="action">playlist-close</attribute>
+                                                        </item>
+                                                    </menu>
+                                                </property>
                                             </object>
                                         </property>
                                     </object>
-                                    <!--                                    <object class="PlaylistUi" id="playlist">-->
-                                    <!--                                        <signal name="request_add_tracks"-->
-                                    <!--                                                handler="handle_request_add_tracks"-->
-                                    <!--                                                swapped="true"/>-->
-                                    <!--                                        <signal name="request_move_tracks"-->
-                                    <!--                                                handler="handle_request_move_tracks"-->
-                                    <!--                                                swapped="true"/>-->
-                                    <!--                                        <signal name="request_remove_tracks"-->
-                                    <!--                                                handler="handle_request_remove_tracks"-->
-                                    <!--                                                swapped="true"/>-->
-                                    <!--                                        <signal name="activate"-->
-                                    <!--                                                handler="handle_playlist_activate"-->
-                                    <!--                                                swapped="true"/>-->
-
-                                    <!--                                        <property name="vexpand">true</property>-->
-
-                                    <!--                                        <property name="playlist">-->
-                                    <!--                                            <object class="GListStore">-->
-                                    <!--                                                <property name="item-type">PlaylistItem</property>-->
-                                    <!--                                            </object>-->
-                                    <!--                                        </property>-->
-                                    <!--                                    </object>-->
                                 </child>
                                 <child>
                                     <object class="PlayerUi" id="player">

@@ -100,14 +100,18 @@ mod imp {
     use crate::ui::playlist::PlaylistUi;
     use crate::ui::playlist_item::PlaylistItem;
     use crate::ui::preferences::Preferences;
-    use adw::TabView;
-    use adw::prelude::AdwDialogExt;
+    use adw::glib::WeakRef;
+    use adw::prelude::{AdwDialogExt, AlertDialogExt, AlertDialogExtManual};
     use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
+    use adw::{AlertDialog, TabPage, TabView};
     use async_channel::Sender;
+    use gettextrs::gettext;
     use gtk4::gdk::{Key, ModifierType};
     use gtk4::glib::subclass::InitializingObject;
     use gtk4::glib::{Propagation, clone};
-    use gtk4::prelude::{Cast, GtkWindowExt, ObjectExt, StaticType, WidgetExt};
+    use gtk4::prelude::{
+        Cast, CastNone, EditableExt, EntryExt, GtkWindowExt, ObjectExt, StaticType, WidgetExt,
+    };
     use gtk4::subclass::prelude::ObjectSubclassExt;
     use gtk4::subclass::prelude::WidgetClassExt;
     use gtk4::subclass::prelude::{
@@ -117,7 +121,7 @@ mod imp {
         CompositeTemplateCallbacksClass, CompositeTemplateInitializingExt, WidgetImpl,
     };
     use gtk4::subclass::window::WindowImpl;
-    use gtk4::{CompositeTemplate, TemplateChild, glib, template_callbacks};
+    use gtk4::{CompositeTemplate, Entry, TemplateChild, glib, template_callbacks};
     use log::error;
     use std::cell::RefCell;
     use std::collections::HashMap;
@@ -151,6 +155,7 @@ mod imp {
         pub playlists: HashMap<PlaylistUuid, PlaylistStore>,
         pub database: DatabasePtr,
         pub config: ConfigPtr,
+        pub selected_playlist: Option<WeakRef<TabPage>>,
     }
 
     #[glib::object_subclass]
@@ -208,6 +213,30 @@ mod imp {
                 }
             });
 
+            klass.install_action("playlist-new", None, |window, _, _| {
+                window.imp().new_playlist();
+            });
+
+            klass.install_action("playlist-rename", None, |window, _, _| {
+                if let Some(data) = window.imp().bound_data.borrow().as_ref()
+                    && let Some(page) = &data.selected_playlist
+                    && let Some(page) = page.upgrade()
+                {
+                    window.imp().new_playlist_name(move |_, text| {
+                        page.set_title(text);
+                    });
+                }
+            });
+
+            klass.install_action("playlist-close", None, |window, _, _| {
+                if let Some(data) = window.imp().bound_data.borrow().as_ref()
+                    && let Some(page) = &data.selected_playlist
+                    && let Some(page) = page.upgrade()
+                {
+                    window.imp().playlist_tab_view.close_page(&page);
+                }
+            });
+
             klass.add_binding_action(Key::Q, ModifierType::CONTROL_MASK, "quit");
             klass.add_binding_action(Key::Z, ModifierType::CONTROL_MASK, "current-playlist-undo");
             klass.add_binding_action(
@@ -231,10 +260,102 @@ mod imp {
             config: ConfigPtr,
             commands: Sender<Command>,
         ) {
-            let playlist = gio::ListStore::with_type(PlaylistItem::static_type()); // TODO: self.playlist.playlist().unwrap();
-            let playlist =
-                PlaylistStore::wrap_and_load(playlist, &database.read().unwrap(), config.clone());
+            self.media_panel_music.bind_data(database.clone());
+            self.media_panel_music.repopulate();
+            self.media_panel_books.bind_data(database.clone());
+            self.media_panel_books.repopulate();
 
+            self.info_panel.bind_data(database.clone());
+
+            let playlist = PlaylistStore::load(&database.read().unwrap(), &config);
+
+            self.bound_data.replace(Some(BoundData {
+                commands,
+                playlists: Default::default(),
+                database,
+                config,
+                selected_playlist: None,
+            }));
+
+            self.append_playlist(playlist, &gettext("playlist-default-name"));
+
+            self.playlist_tab_view.connect_setup_menu(clone!(
+                #[weak(rename_to=this)]
+                self,
+                move |_, page| {
+                    this.bound_data
+                        .borrow_mut()
+                        .as_mut()
+                        .unwrap()
+                        .selected_playlist = page.map(|p| p.downgrade());
+                }
+            ));
+        }
+
+        #[inline(always)]
+        fn command(&self, command: Command) {
+            self.bound_data
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .commands
+                .send_blocking(command)
+                .unwrap()
+        }
+    }
+
+    impl Window {
+        pub fn new_playlist(&self) {
+            self.new_playlist_name(|this, text| {
+                let store = if let Some(bound_data) = this.bound_data.borrow().as_ref() {
+                    PlaylistStore::new(&bound_data.config)
+                } else {
+                    return;
+                };
+                this.append_playlist(store, &text);
+            });
+        }
+
+        pub fn new_playlist_name<F>(&self, f: F)
+        where
+            F: Fn(&Self, &str) + 'static,
+        {
+            let entry = Entry::new();
+
+            let dialog = AlertDialog::new(Some(&gettext("new-playlist-name")), None);
+            dialog.set_extra_child(Some(&entry));
+            dialog.add_response("yes", &gettext("ok"));
+            dialog.add_response("no", &gettext("cancel"));
+            dialog.set_close_response("no");
+
+            entry.connect_activate(clone!(
+                #[weak]
+                dialog,
+                move |_| {
+                    dialog.set_close_response("yes");
+                    dialog.close();
+                }
+            ));
+
+            dialog.connect_response(
+                None,
+                clone!(
+                    #[weak(rename_to=this)]
+                    self,
+                    move |dialog, response| {
+                        if response == "yes" {
+                            let text = dialog.extra_child().and_downcast::<Entry>().unwrap().text();
+                            f(&this, &text);
+                        }
+                    }
+                ),
+            );
+
+            dialog.present(Some(&self.obj().clone()));
+            entry.grab_focus();
+        }
+
+        pub fn append_playlist(&self, playlist: PlaylistStore, name: &str) {
             let playlist_ui = PlaylistUi::new(&playlist);
             playlist_ui.connect_request_add_tracks(clone!(
                 #[weak(rename_to=this)]
@@ -257,37 +378,18 @@ mod imp {
                 move |p, n| this.handle_playlist_activate(p, n)
             ));
 
-            self.playlist_tab_view.append(&playlist_ui);
+            let page = self.playlist_tab_view.append(&playlist_ui);
+            page.set_title(name);
+            self.playlist_tab_view.set_selected_page(&page);
 
-            self.media_panel_music.bind_data(database.clone());
-            self.media_panel_music.repopulate();
-            self.media_panel_books.bind_data(database.clone());
-            self.media_panel_books.repopulate();
-
-            self.info_panel.bind_data(database.clone());
-
-            self.bound_data.replace(Some(BoundData {
-                commands,
-                playlists: [(playlist.uuid(), playlist)].into(),
-                database,
-                config,
-            }));
-        }
-
-        #[inline(always)]
-        fn command(&self, command: Command) {
             self.bound_data
-                .borrow()
-                .as_ref()
+                .borrow_mut()
+                .as_mut()
                 .unwrap()
-                .commands
-                .send_blocking(command)
-                .unwrap()
+                .playlists
+                .insert(playlist.uuid(), playlist);
         }
-    }
 
-    #[template_callbacks]
-    impl Window {
         pub fn current_playlist(&self) -> Option<PlaylistUuid> {
             self.playlist_tab_view
                 .selected_page()
@@ -323,7 +425,10 @@ mod imp {
         fn handle_playlist_activate(&self, playlist: PlaylistUi, pos: u32) {
             self.command(Command::PlayFromPlaylist(playlist.uuid(), pos))
         }
+    }
 
+    #[template_callbacks]
+    impl Window {
         #[template_callback]
         fn handle_ended(&self) {
             self.command(Command::Next)
@@ -375,6 +480,43 @@ mod imp {
             }
 
             Propagation::Proceed
+        }
+
+        #[template_callback]
+        fn handle_playlist_close(&self, page: &TabPage) -> Propagation {
+            let dialog = AlertDialog::new(Some(&gettext("sure-delete-playlist")), None);
+            dialog.add_response("yes", &gettext("ok"));
+            dialog.add_response("no", &gettext("cancel"));
+            dialog.set_close_response("no");
+
+            dialog.connect_response(
+                None,
+                clone!(
+                    #[weak(rename_to=this)]
+                    self,
+                    #[weak]
+                    page,
+                    move |_, response| {
+                        if response == "yes" {
+                            if let Some(data) = this.bound_data.borrow_mut().as_mut() {
+                                let uuid = page.child().downcast::<PlaylistUi>().unwrap().uuid();
+                                data.playlists.remove(&uuid);
+                            }
+                            this.playlist_tab_view.close_page_finish(&page, true)
+                        } else {
+                            this.playlist_tab_view.close_page_finish(&page, false)
+                        }
+                    }
+                ),
+            );
+
+            dialog.present(Some(&self.obj().clone()));
+            Propagation::Stop
+        }
+
+        #[template_callback]
+        fn handle_new_playlist(&self) {
+            self.new_playlist()
         }
     }
 
