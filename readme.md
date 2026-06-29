@@ -43,7 +43,6 @@ Why?
 for 1.3:
 
 - many playlists
-    - translations
     - move to separate widget
 - save/load playlist
 - save last timestamp in audiobooks
