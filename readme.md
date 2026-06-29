@@ -43,7 +43,6 @@ Why?
 for 1.3:
 
 - many playlists
-    - save/load
     - translations
     - move to separate widget
 - save/load playlist

@@ -1,4 +1,4 @@
-use crate::config::{Config, ConfigPtr, RandomMode};
+use crate::config::{Config, RandomMode};
 use crate::control::commands_history::CommandsHistory;
 use crate::control::random_data::RandomData;
 use crate::data::playlist_uuid::PlaylistUuid;
@@ -6,11 +6,8 @@ use crate::data::track::TrackId;
 use crate::db::database::Database;
 use crate::ui::playlist_item::PlaylistItem;
 use gio::prelude::{ListModelExt, ListModelExtManual};
-use gtk4::glib;
-use gtk4::glib::clone;
 use gtk4::prelude::{Cast, CastNone, StaticType};
-use log::warn;
-use std::fs;
+use serde::{Serialize, Serializer};
 
 pub struct PlaylistStore {
     uuid: PlaylistUuid,
@@ -20,8 +17,7 @@ pub struct PlaylistStore {
 }
 
 impl PlaylistStore {
-    // TODO: saving
-    pub fn new(config: &ConfigPtr) -> Self {
+    pub fn new(config: &Config) -> Self {
         let uuid = PlaylistUuid::new();
 
         let store = gio::ListStore::with_type(PlaylistItem::static_type());
@@ -29,30 +25,25 @@ impl PlaylistStore {
         Self {
             uuid,
             history: Default::default(),
-            random_data: Self::make_random_data(&config.read().unwrap(), store.n_items()),
+            random_data: Self::make_random_data(&config, store.n_items()),
             list: store,
         }
     }
 
-    pub fn load(database: &Database, config: &ConfigPtr) -> Self {
+    pub fn from(tracks: &Vec<TrackId>, database: &Database, config: &Config) -> Self {
         let uuid = PlaylistUuid::new();
         let store = gio::ListStore::with_type(PlaylistItem::static_type());
 
-        let path = config.read().unwrap().playlists_path();
-
-        if let Ok(file) = fs::File::open(path) {
-            let tracks: Vec<TrackId> = serde_json::from_reader(file).unwrap();
-            for track_id in tracks {
-                if database.any_has_track(track_id) {
-                    store.append(&PlaylistItem::new(uuid, track_id, database));
-                }
+        for track_id in tracks {
+            if database.any_has_track(*track_id) {
+                store.append(&PlaylistItem::new(uuid, *track_id, database));
             }
         }
 
         Self {
             uuid,
             history: Default::default(),
-            random_data: Self::make_random_data(&config.read().unwrap(), store.n_items()),
+            random_data: Self::make_random_data(config, store.n_items()),
             list: store,
         }
     }
@@ -140,22 +131,12 @@ impl PlaylistStore {
     }
 }
 
-fn save_playlist(store: &gio::ListStore, config: &ConfigPtr) {
-    let config = config.read().unwrap();
-
-    fs::create_dir_all(config.playlists_path().parent().unwrap()).unwrap();
-    match fs::File::create(config.playlists_path()) {
-        Err(e) => {
-            warn!("Error creating playlist file: {}", e);
-        }
-        Ok(file) => {
-            let playlist: Vec<TrackId> = store
-                .iter::<PlaylistItem>()
-                .filter_map(|i| i.ok())
-                .map(|p| p.stored_track())
-                .collect();
-
-            serde_json::to_writer(file, &playlist).unwrap();
-        }
+impl Serialize for PlaylistStore {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let playlist: Vec<TrackId> = self.iter().map(|p| p.stored_track()).collect();
+        playlist.serialize(serializer)
     }
 }

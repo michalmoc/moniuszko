@@ -93,15 +93,15 @@ mod imp {
     use crate::data::object_id::{ObjectId, ObjectIds};
     use crate::data::playlist_entry_uuid::PlaylistEntryUuids;
     use crate::data::playlist_uuid::PlaylistUuid;
+    use crate::data::track::TrackId;
     use crate::db::database::DatabasePtr;
     use crate::ui::info_panel::InfoPanel;
     use crate::ui::media_panel::MediaPanel;
     use crate::ui::player::PlayerUi;
     use crate::ui::playlist::PlaylistUi;
-    use crate::ui::playlist_item::PlaylistItem;
     use crate::ui::preferences::Preferences;
-    use adw::glib::WeakRef;
-    use adw::prelude::{AdwDialogExt, AlertDialogExt, AlertDialogExtManual};
+    use adw::glib::{ControlFlow, WeakRef, timeout_add_local};
+    use adw::prelude::{AdwDialogExt, AlertDialogExt};
     use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
     use adw::{AlertDialog, TabPage, TabView};
     use async_channel::Sender;
@@ -110,7 +110,7 @@ mod imp {
     use gtk4::glib::subclass::InitializingObject;
     use gtk4::glib::{Propagation, clone};
     use gtk4::prelude::{
-        Cast, CastNone, EditableExt, EntryExt, GtkWindowExt, ObjectExt, StaticType, WidgetExt,
+        Cast, CastNone, EditableExt, EntryExt, GtkWindowExt, ObjectExt, WidgetExt,
     };
     use gtk4::subclass::prelude::ObjectSubclassExt;
     use gtk4::subclass::prelude::WidgetClassExt;
@@ -122,9 +122,13 @@ mod imp {
     };
     use gtk4::subclass::window::WindowImpl;
     use gtk4::{CompositeTemplate, Entry, TemplateChild, glib, template_callbacks};
-    use log::error;
+    use itertools::Itertools;
+    use log::{error, info, warn};
     use std::cell::RefCell;
     use std::collections::HashMap;
+    use std::fs;
+    use std::fs::File;
+    use std::time::Duration;
 
     #[derive(CompositeTemplate, Default)]
     #[template(resource = "/org/moniuszko/window.ui")]
@@ -267,17 +271,28 @@ mod imp {
 
             self.info_panel.bind_data(database.clone());
 
-            let playlist = PlaylistStore::load(&database.read().unwrap(), &config);
-
             self.bound_data.replace(Some(BoundData {
                 commands,
                 playlists: Default::default(),
-                database,
-                config,
+                database: database.clone(),
+                config: config.clone(),
                 selected_playlist: None,
             }));
 
-            self.append_playlist(playlist, &gettext("playlist-default-name"));
+            if let Ok(playlists_file) = File::open(config.read().unwrap().playlists_path())
+                && let Ok(tracklists) =
+                    serde_json::from_reader::<_, Vec<(String, Vec<TrackId>)>>(playlists_file)
+            {
+                let db = database.read().unwrap();
+                let cfg = config.read().unwrap();
+                for (title, tracks) in tracklists {
+                    let playlist = PlaylistStore::from(&tracks, &db, &cfg);
+                    self.append_playlist(playlist, &title);
+                }
+            } else {
+                let playlist = PlaylistStore::new(&config.read().unwrap());
+                self.append_playlist(playlist, &gettext("playlist-default-name"));
+            }
 
             self.playlist_tab_view.connect_setup_menu(clone!(
                 #[weak(rename_to=this)]
@@ -290,6 +305,22 @@ mod imp {
                         .selected_playlist = page.map(|p| p.downgrade());
                 }
             ));
+
+            timeout_add_local(
+                Duration::from_mins(5),
+                clone!(
+                    #[weak(rename_to=this)]
+                    self,
+                    #[upgrade_or]
+                    ControlFlow::Break,
+                    move || {
+                        info!("saving data");
+                        this.save_config();
+                        this.save_playlists();
+                        ControlFlow::Continue
+                    }
+                ),
+            );
         }
 
         #[inline(always)]
@@ -308,7 +339,7 @@ mod imp {
         pub fn new_playlist(&self) {
             self.new_playlist_name(|this, text| {
                 let store = if let Some(bound_data) = this.bound_data.borrow().as_ref() {
-                    PlaylistStore::new(&bound_data.config)
+                    PlaylistStore::new(&bound_data.config.read().unwrap())
                 } else {
                     return;
                 };
@@ -425,6 +456,51 @@ mod imp {
         fn handle_playlist_activate(&self, playlist: PlaylistUi, pos: u32) {
             self.command(Command::PlayFromPlaylist(playlist.uuid(), pos))
         }
+
+        fn save_config(&self) {
+            if let Some(bound_data) = self.bound_data.borrow().as_ref() {
+                let mut cfg = bound_data.config.write().unwrap();
+                let obj = self.obj();
+
+                cfg.window_width = obj.width();
+                cfg.window_height = obj.height();
+                cfg.window_maximized = obj.is_maximized();
+
+                if let Err(e) = cfg.save() {
+                    error!("Error saving config: {}", e);
+                }
+            }
+        }
+
+        fn save_playlists(&self) {
+            if let Some(data) = self.bound_data.borrow().as_ref() {
+                let path = data.config.read().unwrap().playlists_path();
+
+                let to_save = (0..self.playlist_tab_view.n_pages())
+                    .map(|i| self.playlist_tab_view.nth_page(i))
+                    .map(|p| {
+                        (
+                            p.title().to_string(),
+                            p.child().downcast::<PlaylistUi>().unwrap().uuid(),
+                        )
+                    })
+                    .filter_map(|(title, uuid)| {
+                        data.playlists.get(&uuid).map(|playlist| (title, playlist))
+                    })
+                    .collect_vec();
+
+                let file =
+                    fs::create_dir_all(path.parent().unwrap()).and_then(|_| fs::File::create(path));
+                match file {
+                    Err(e) => {
+                        warn!("Error creating playlist file: {}", e);
+                    }
+                    Ok(file) => {
+                        serde_json::to_writer(file, &to_save).unwrap();
+                    }
+                }
+            }
+        }
     }
 
     #[template_callbacks]
@@ -466,18 +542,9 @@ mod imp {
 
         #[template_callback]
         fn handle_close_request(&self) -> Propagation {
-            if let Some(bound_data) = self.bound_data.borrow().as_ref() {
-                let mut cfg = bound_data.config.write().unwrap();
-                let obj = self.obj();
-
-                cfg.window_width = obj.width();
-                cfg.window_height = obj.height();
-                cfg.window_maximized = obj.is_maximized();
-
-                if let Err(e) = cfg.save() {
-                    error!("Error saving config: {}", e);
-                }
-            }
+            info!("saving data");
+            self.save_playlists();
+            self.save_config();
 
             Propagation::Proceed
         }
