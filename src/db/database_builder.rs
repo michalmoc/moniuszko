@@ -6,12 +6,13 @@ use crate::db::database::Subdatabase;
 use crate::db::file_data::{AlbumIdentification, FileData};
 use crate::db::musicbrainz::MusicBrainz;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use ustr::Ustr;
 use uuid::Uuid;
 
 #[derive(Default)]
 pub struct DatabaseBuilder {
+    files: HashMap<PathBuf, TrackId>,
     tracks: HashMap<TrackId, Track>,
     albums: HashMap<AlbumId, Album>,
     artists: HashMap<ArtistId, Artist>,
@@ -32,6 +33,7 @@ struct FoundArtists {
 impl DatabaseBuilder {
     pub fn build(self) -> Subdatabase {
         Subdatabase {
+            files: self.files,
             tracks: self.tracks,
             albums: self.albums,
             years: self.years,
@@ -76,6 +78,8 @@ impl DatabaseBuilder {
                 year: data.year,
             },
         );
+
+        self.files.insert(path.to_path_buf(), data.track_id);
     }
 
     fn fill_artists(&mut self, found_artists: &FoundArtists, album: AlbumId) {

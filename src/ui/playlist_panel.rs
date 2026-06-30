@@ -4,12 +4,17 @@ use crate::control::playlist_store::PlaylistStore;
 use crate::data::playlist_uuid::PlaylistUuid;
 use crate::db::database::Database;
 use crate::ui::playlist::PlaylistUi;
+use crate::utils::absolutize;
 use async_channel::Sender;
+use gettextrs::gettext;
 use gtk4::prelude::Cast;
 use gtk4::subclass::prelude::ObjectSubclassIsExt;
 use gtk4::{Widget, glib};
+use log::{error, warn};
+use m3u::Entry;
 use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
+use std::path::Path;
 
 glib::wrapper! {
     pub struct PlaylistPanel(ObjectSubclass<imp::PlaylistPanel>)
@@ -20,6 +25,10 @@ glib::wrapper! {
 impl PlaylistPanel {
     pub fn current(&self) -> Option<PlaylistUuid> {
         self.imp().current_playlist()
+    }
+
+    pub fn current_name(&self) -> Option<String> {
+        self.imp().current_playlist_name()
     }
 
     pub fn request_delete_selected(&self) {
@@ -79,6 +88,57 @@ impl PlaylistPanel {
 
     pub fn bind_data(&self, commands: Sender<Command>) {
         self.imp().commands.replace(Some(commands));
+    }
+
+    pub fn save_to_file(&self, uuid: PlaylistUuid, path: &Path) {
+        if let Some(playlist) = self.imp().playlists.borrow().get(&uuid) {
+            let playlist = playlist.iter().map(|i| m3u::path_entry(i.path()));
+
+            let Ok(mut file) = std::fs::File::create(path) else {
+                error!("cannot create file {}", path.display());
+                return;
+            };
+            let mut writer = m3u::Writer::new(&mut file);
+            for entry in playlist {
+                if let Err(e) = writer.write_entry(&entry) {
+                    warn!("{}", e);
+                }
+            }
+        }
+    }
+
+    pub fn load_from_file(&self, m3u_path: &Path, database: &Database, config: &Config) {
+        let name = m3u_path
+            .file_stem()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| gettext("playlist-default-name"));
+
+        let mut tracks = Vec::new();
+
+        let base_path = m3u_path.parent().unwrap();
+        let mut reader = m3u::Reader::open(m3u_path).unwrap();
+        for entry in reader.entries() {
+            match entry {
+                Ok(Entry::Path(path)) => {
+                    if let Ok(path) = absolutize(base_path.to_owned(), &path)
+                        && let Some(track) = database.get_file(&path)
+                    {
+                        tracks.push(track);
+                    } else {
+                        warn!("cannot open file {}", path.display());
+                    }
+                }
+                Ok(Entry::Url(_)) => {
+                    warn!("url-s are not supported")
+                }
+                Err(err) => {
+                    warn!("cannot read entry: {}", err);
+                }
+            }
+        }
+
+        let store = PlaylistStore::from(&tracks, database, config);
+        self.imp().append_playlist(store, &name);
     }
 }
 
@@ -173,6 +233,10 @@ mod imp {
             self.tab_view
                 .selected_page()
                 .map(|p| p.child().downcast::<PlaylistUi>().unwrap().uuid())
+        }
+
+        pub fn current_playlist_name(&self) -> Option<String> {
+            self.tab_view.selected_page().map(|p| p.title().to_string())
         }
 
         pub fn new_playlist(&self, config: ConfigPtr) {

@@ -21,6 +21,16 @@
                                             </item>
                                             <item>
                                                 <attribute name="label"
+                                                           translatable="yes">menu-save</attribute>
+                                                <attribute name="action">playlist-save-to-file</attribute>
+                                            </item>
+                                            <item>
+                                                <attribute name="label"
+                                                           translatable="yes">menu-load</attribute>
+                                                <attribute name="action">playlist-load-from-file</attribute>
+                                            </item>
+                                            <item>
+                                                <attribute name="label"
                                                            translatable="yes">menu-undo</attribute>
                                                 <attribute name="action">current-playlist-undo</attribute>
                                             </item>

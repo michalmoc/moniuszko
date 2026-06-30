@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-29 19:39+0200\n"
+"POT-Creation-Date: 2026-07-01 00:29+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -24,26 +24,31 @@ msgstr "Lista odtwarzania"
 
 #: src/resources/window.ui:16 src/resources/window.ui:18
 #: src/resources/window.ui:28 src/resources/window.ui:33
+#: src/resources/window.ui:43
 msgid "menu-remove-selected-from-playlist"
 msgstr "Usuń zaznaczone"
 
 #: src/resources/window.ui:22 src/resources/window.ui:24
 #: src/resources/window.ui:34 src/resources/window.ui:39
+#: src/resources/window.ui:49
 msgid "menu-clear-playlist"
 msgstr "Opróżnij"
 
 #: src/resources/window.ui:27 src/resources/window.ui:29
 #: src/resources/window.ui:39 src/resources/window.ui:44
+#: src/resources/window.ui:54
 msgid "menu-program"
 msgstr "Program"
 
 #: src/resources/window.ui:29 src/resources/window.ui:31
 #: src/resources/window.ui:41 src/resources/window.ui:46
+#: src/resources/window.ui:56
 msgid "menu-config"
 msgstr "Opcje"
 
 #: src/resources/window.ui:33 src/resources/window.ui:35
 #: src/resources/window.ui:45 src/resources/window.ui:50
+#: src/resources/window.ui:60
 msgid "menu-quit"
 msgstr "Zakończ"
 
@@ -145,35 +150,37 @@ msgid "year-album"
 msgstr "Rok / Album"
 
 #: src/playlist/ui.rs:194 src/ui/playlist.rs:163 src/ui/playlist.rs:154
-#: src/ui/playlist.rs:155 src/ui/playlist.rs:224
+#: src/ui/playlist.rs:155 src/ui/playlist.rs:224 src/ui/playlist.rs:224
 msgid "column-track"
 msgstr "#"
 
 #: src/playlist/ui.rs:195 src/ui/playlist.rs:164 src/ui/playlist.rs:155
-#: src/ui/playlist.rs:156 src/ui/playlist.rs:225
+#: src/ui/playlist.rs:156 src/ui/playlist.rs:225 src/ui/playlist.rs:225
 msgid "column-title"
 msgstr "Tytuł"
 
 #: src/playlist/ui.rs:196 src/ui/playlist.rs:165 src/ui/playlist.rs:156
-#: src/ui/playlist.rs:157 src/ui/playlist.rs:226
+#: src/ui/playlist.rs:157 src/ui/playlist.rs:226 src/ui/playlist.rs:226
 msgid "column-artists"
 msgstr "Artyści"
 
 #: src/playlist/ui.rs:197 src/ui/playlist.rs:166 src/ui/playlist.rs:157
-#: src/ui/playlist.rs:158 src/ui/playlist.rs:227
+#: src/ui/playlist.rs:158 src/ui/playlist.rs:227 src/ui/playlist.rs:227
 msgid "column-album"
 msgstr "Album"
 
 #: src/playlist/ui.rs:198 src/ui/playlist.rs:167 src/ui/playlist.rs:158
-#: src/ui/playlist.rs:159 src/ui/playlist.rs:228
+#: src/ui/playlist.rs:159 src/ui/playlist.rs:228 src/ui/playlist.rs:228
 msgid "column-duration"
 msgstr "Długość"
 
 #: src/resources/window.ui:19 src/resources/window.ui:24
+#: src/resources/window.ui:34
 msgid "menu-undo"
 msgstr "Cofnij"
 
 #: src/resources/window.ui:24 src/resources/window.ui:29
+#: src/resources/window.ui:39
 msgid "menu-redo"
 msgstr "Powtórz"
 
@@ -191,16 +198,18 @@ msgstr "Permutacja"
 
 #: src/resources/window.ui:73 src/resources/window.ui:84
 #: src/resources/window.ui:85 src/resources/window.ui:90
+#: src/resources/window.ui:100
 msgid "tab-music"
 msgstr "Muzyka"
 
 #: src/resources/window.ui:86 src/resources/window.ui:97
 #: src/resources/window.ui:98 src/resources/window.ui:103
+#: src/resources/window.ui:113
 msgid "tab-books"
 msgstr "Książki"
 
 #: src/resources/window.ui:71 src/resources/window.ui:72
-#: src/resources/window.ui:77
+#: src/resources/window.ui:77 src/resources/window.ui:87
 msgid "tab-info"
 msgstr "O utworze"
 
@@ -228,34 +237,45 @@ msgstr "nieznany gatunek"
 msgid "placeholder-year"
 msgstr "nieznany rok"
 
-#: src/ui/window.rs:294
+#: src/ui/window.rs:294 src/ui/playlist_panel.rs:116
+#: src/ui/playlist_panel.rs:370
 msgid "playlist-default-name"
 msgstr "Domyślna"
 
-#: src/ui/window.rs:356
+#: src/ui/window.rs:356 src/ui/playlist_panel.rs:257
 msgid "new-playlist-name"
 msgstr "Podaj nową nazwę"
 
-#: src/ui/window.rs:358 src/ui/window.rs:555
+#: src/ui/window.rs:358 src/ui/window.rs:555 src/ui/playlist_panel.rs:259
+#: src/ui/playlist_panel.rs:407
 msgid "ok"
 msgstr "OK"
 
-#: src/ui/window.rs:359 src/ui/window.rs:556
+#: src/ui/window.rs:359 src/ui/window.rs:556 src/ui/playlist_panel.rs:260
+#: src/ui/playlist_panel.rs:408
 msgid "cancel"
 msgstr "Cofnij"
 
-#: src/ui/window.rs:554
+#: src/ui/window.rs:554 src/ui/playlist_panel.rs:406
 msgid "sure-delete-playlist"
 msgstr "Na pewno usunąć listę?"
 
-#: src/resources/window.ui:19
+#: src/resources/window.ui:19 src/resources/window.ui:19
 msgid "menu-new"
 msgstr "Stwórz nową"
 
-#: src/resources/window.ui:140
+#: src/resources/window.ui:140 src/resources/playlist_panel.ui:29
 msgid "playlist-rename"
 msgstr "Zmień nazwę"
 
-#: src/resources/window.ui:145
+#: src/resources/window.ui:145 src/resources/playlist_panel.ui:33
 msgid "playlist-close"
 msgstr "Usuń"
+
+#: src/resources/window.ui:24
+msgid "menu-save"
+msgstr "Zapisz"
+
+#: src/resources/window.ui:29
+msgid "menu-load"
+msgstr "Wczytaj"

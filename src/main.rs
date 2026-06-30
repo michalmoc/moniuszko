@@ -5,6 +5,7 @@ mod data;
 mod db;
 mod languages;
 mod ui;
+pub mod utils;
 
 use crate::config::{Config, ConfigPtr};
 use crate::constants::APP_ID;

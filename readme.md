@@ -42,7 +42,6 @@ Why?
 
 for 1.3:
 
-- save/load playlist
 - save last timestamp in audiobooks
 
 other:

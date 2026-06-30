@@ -10,11 +10,13 @@ use itertools::Itertools;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Index;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use ustr::Ustr;
 
 #[derive(Default)]
 pub struct Subdatabase {
+    pub files: HashMap<PathBuf, TrackId>,
     pub tracks: HashMap<TrackId, Track>,
     pub albums: HashMap<AlbumId, Album>,
     pub years: BTreeMap<Option<u16>, HashSet<AlbumId>>,
@@ -36,6 +38,10 @@ fn cmp_o<T: AsRef<str>>(a: &Option<T>, b: &Option<T>) -> Ordering {
 }
 
 impl Subdatabase {
+    pub fn get_file(&self, path: &Path) -> Option<TrackId> {
+        self.files.get(path).copied()
+    }
+
     pub fn has_track(&self, track_id: TrackId) -> bool {
         self.tracks.contains_key(&track_id)
     }
@@ -337,6 +343,10 @@ pub struct Database {
 }
 
 impl Database {
+    pub fn get_file(&self, path: &Path) -> Option<TrackId> {
+        self.music.get_file(path).or(self.books.get_file(path))
+    }
+
     pub fn get_subdb(&self, db: AvailableDatabases) -> &Subdatabase {
         match db {
             AvailableDatabases::Music => &self.music,

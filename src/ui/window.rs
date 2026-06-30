@@ -91,6 +91,8 @@ mod imp {
     use adw::prelude::AdwDialogExt;
     use adw::subclass::prelude::{AdwApplicationWindowImpl, ObjectSubclassIsExt};
     use async_channel::Sender;
+    use gio::Cancellable;
+    use gio::prelude::FileExt;
     use gtk4::gdk::{Key, ModifierType};
     use gtk4::glib::subclass::InitializingObject;
     use gtk4::glib::{Propagation, clone};
@@ -104,7 +106,9 @@ mod imp {
         CompositeTemplateCallbacksClass, CompositeTemplateInitializingExt, WidgetImpl,
     };
     use gtk4::subclass::window::WindowImpl;
-    use gtk4::{CompositeTemplate, TemplateChild, glib, template_callbacks};
+    use gtk4::{
+        CompositeTemplate, FileDialog, FileFilter, TemplateChild, glib, template_callbacks,
+    };
     use log::{error, info};
     use std::cell::RefCell;
     use std::time::Duration;
@@ -198,6 +202,14 @@ mod imp {
                 }
             });
 
+            klass.install_action("playlist-save-to-file", None, |window, _, _| {
+                window.imp().save_playlist_to_file()
+            });
+
+            klass.install_action("playlist-load-from-file", None, |window, _, _| {
+                window.imp().load_playlist_from_file()
+            });
+
             klass.add_binding_action(Key::Q, ModifierType::CONTROL_MASK, "quit");
             klass.add_binding_action(Key::Z, ModifierType::CONTROL_MASK, "current-playlist-undo");
             klass.add_binding_action(
@@ -285,6 +297,64 @@ mod imp {
                     error!("Error saving config: {}", e);
                 }
             }
+        }
+
+        fn save_playlist_to_file(&self) {
+            if let Some(uuid) = self.playlist_panel.current()
+                && let Some(name) = self.playlist_panel.current_name()
+            {
+                let filter = FileFilter::new();
+                filter.add_suffix("m3u");
+
+                let dialog = FileDialog::builder()
+                    .default_filter(&filter)
+                    .initial_name(name + ".m3u")
+                    .build();
+
+                dialog.save(
+                    Some(&*self.obj()),
+                    None::<&Cancellable>,
+                    clone!(
+                        #[weak(rename_to=this)]
+                        self,
+                        move |result| {
+                            if let Ok(file) = result
+                                && let Some(path) = file.path()
+                            {
+                                this.playlist_panel.save_to_file(uuid, &path)
+                            }
+                        }
+                    ),
+                );
+            }
+        }
+
+        fn load_playlist_from_file(&self) {
+            let filter = FileFilter::new();
+            filter.add_suffix("m3u");
+
+            let dialog = FileDialog::builder().default_filter(&filter).build();
+
+            dialog.open(
+                Some(&*self.obj()),
+                None::<&Cancellable>,
+                clone!(
+                    #[weak(rename_to=this)]
+                    self,
+                    move |result| {
+                        if let Ok(file) = result
+                            && let Some(path) = file.path()
+                            && let Some(data) = this.bound_data.borrow().as_ref()
+                        {
+                            this.playlist_panel.load_from_file(
+                                &path,
+                                &data.database.read().unwrap(),
+                                &data.config.read().unwrap(),
+                            );
+                        }
+                    }
+                ),
+            );
         }
     }
 
